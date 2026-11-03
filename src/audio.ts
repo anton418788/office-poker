@@ -1,29 +1,50 @@
 import type { GameSound } from "../shared/sound-events";
-
-// Short synthesized foley, generated locally: no downloads or third-party audio.
+const files = {
+  cards: ["card-slide-1", "card-place-1"],
+  chips: ["chip-lay-1", "chips-collide-1", "chips-collide-2", "chips-stack-3"],
+  payout: ["chips-handle-2", "chips-stack-1"],
+};
 export function createAudioPlayer() {
-  let context: AudioContext | null = null;
-  let master: GainNode | null = null;
-  let enabled = true;
+  let context: AudioContext | null = null,
+    master: GainNode | null = null,
+    enabled = true;
+  const buffers = new Map<string, AudioBuffer>(),
+    loading = new Set<string>();
+  let closed = false;
+  async function load(name: string) {
+    if (!context || buffers.has(name) || loading.has(name)) return;
+    loading.add(name);
+    try {
+      const response = await fetch(`/audio/${name}.mp3`);
+      if (!response.ok) return;
+      const buffer = await context.decodeAudioData(
+        await response.arrayBuffer(),
+      );
+      if (!closed) buffers.set(name, buffer);
+    } catch {
+    } finally {
+      loading.delete(name);
+    }
+  }
   return {
     setEnabled(value: boolean) {
       enabled = value;
-      if (master) master.gain.value = value ? 0.32 : 0;
+      if (master) master.gain.value = value ? 0.75 : 0;
     },
     unlock() {
-      if (!enabled) return;
+      if (!enabled || closed) return;
       try {
         if (!context) {
           context = new AudioContext();
           master = context.createGain();
-          master.gain.value = 0.32;
+          master.gain.value = 0.75;
           master.connect(context.destination);
+          for (const name of new Set(Object.values(files).flat()))
+            void load(name);
         }
         if (context.state === "suspended")
           void context.resume().catch(() => {});
-      } catch {
-        /* A browser without audio still gets the complete game. */
-      }
+      } catch {}
     },
     play(sound: GameSound, delay = 0) {
       if (!enabled || !context || context.state !== "running" || !master)
@@ -31,75 +52,56 @@ export function createAudioPlayer() {
       const ctx = context,
         output = master,
         start = ctx.currentTime + delay;
-      function tone(
-        time: number,
-        frequency: number,
-        duration: number,
-        volume: number,
-      ) {
-        const osc = ctx.createOscillator(),
-          gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(frequency, time);
-        gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(volume, time + 0.003);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-        osc.connect(gain);
-        gain.connect(output);
-        osc.start(time);
-        osc.stop(time + duration);
-      }
-      function noise(
-        time: number,
-        duration: number,
-        frequency: number,
-        volume: number,
-      ) {
-        const buffer = ctx.createBuffer(
-          1,
-          Math.ceil(ctx.sampleRate * duration),
-          ctx.sampleRate,
-        );
-        const samples = buffer.getChannelData(0);
-        for (let i = 0; i < samples.length; i++)
-          samples[i] = Math.random() * 2 - 1;
-        const source = ctx.createBufferSource(),
-          filter = ctx.createBiquadFilter(),
-          gain = ctx.createGain();
-        source.buffer = buffer;
-        filter.type = "bandpass";
-        filter.frequency.setValueAtTime(frequency, time);
-        filter.frequency.exponentialRampToValueAtTime(
-          frequency * 0.55,
-          time + duration,
-        );
-        filter.Q.value = 0.7;
-        gain.gain.setValueAtTime(0.001, time);
-        gain.gain.linearRampToValueAtTime(volume, time + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-        source.connect(filter);
-        filter.connect(gain);
-        gain.connect(output);
-        source.start(time);
-        source.stop(time + duration);
-      }
-      if (sound === "cards") {
-        for (let i = 0; i < 3; i++) noise(start + i * 0.085, 0.12, 3100, 0.42);
-      } else if (sound === "chips") {
-        for (let i = 0; i < 4; i++) {
-          tone(start + i * 0.037, 1700 + i * 370, 0.065, 0.15);
-          tone(start + i * 0.037, 3100 - i * 170, 0.035, 0.07);
-          noise(start + i * 0.037, 0.045, 4800, 0.12);
+      if (sound === "turn") {
+        for (const [offset, frequency] of [
+          [0, 523.25],
+          [0.13, 783.99],
+        ]) {
+          const osc = ctx.createOscillator(),
+            gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = frequency;
+          gain.gain.setValueAtTime(0, start + offset);
+          gain.gain.linearRampToValueAtTime(0.09, start + offset + 0.012);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + offset + 0.23);
+          osc.connect(gain);
+          gain.connect(output);
+          osc.start(start + offset);
+          osc.stop(start + offset + 0.24);
         }
-      } else {
-        tone(start, 660, 0.15, 0.22);
-        tone(start + 0.13, 880, 0.24, 0.2);
+        return;
+      }
+      const options = files[sound],
+        name = options[Math.floor(Math.random() * options.length)],
+        buffer = buffers.get(name);
+      if (!buffer) {
+        void load(name);
+        return;
+      }
+      const source = ctx.createBufferSource(),
+        gain = ctx.createGain();
+      source.buffer = buffer;
+      source.playbackRate.value = 0.95 + Math.random() * 0.1;
+      gain.gain.value = sound === "cards" ? 0.62 : 0.9;
+      source.connect(gain);
+      gain.connect(output);
+      source.start(start);
+      if (sound === "payout") {
+        const stack = buffers.get("chips-stack-1");
+        if (stack) {
+          const extra = ctx.createBufferSource();
+          extra.buffer = stack;
+          extra.connect(gain);
+          extra.start(start + 0.22);
+        }
       }
     },
     close() {
+      closed = true;
       if (context) void context.close().catch(() => {});
       context = null;
       master = null;
+      buffers.clear();
     },
   };
 }

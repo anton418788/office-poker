@@ -10,7 +10,16 @@ export type Player = {
   bet: number;
   total: number;
 };
+export type ChipTransfer = {
+  id: number;
+  hand: number;
+  seat: number;
+  amount: number;
+  kind: "bet" | "payout";
+};
 export type Game = {
+  transferSeq?: number;
+  transfers?: ChipTransfer[];
   players: Player[];
   deck: Card[];
   board: Card[];

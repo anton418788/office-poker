@@ -65,11 +65,20 @@ function after(g: Game, seat: number, list: Player[]) {
     (a, b) => ((a.seat - seat + 5) % 6) - ((b.seat - seat + 5) % 6),
   )[0];
 }
-function pay(p: Player, n: number) {
+function transfer(g: Game, p: Player, amount: number, kind: "bet" | "payout") {
+  if (amount <= 0) return;
+  g.transferSeq = (g.transferSeq ?? 0) + 1;
+  g.transfers = [
+    ...(g.transfers ?? []),
+    { id: g.transferSeq, hand: g.hand, seat: p.seat, amount, kind },
+  ].slice(-60);
+}
+function pay(g: Game, p: Player, n: number) {
   const v = Math.min(p.chips, n);
   p.chips -= v;
   p.bet += v;
   p.total += v;
+  transfer(g, p, v, "bet");
 }
 function turn(g: Game, p: Player, now: number) {
   g.actor = p.id;
@@ -100,8 +109,8 @@ export function start(g: Game, now = Date.now()) {
       ? players.find((p) => p.seat === g.dealer)!
       : after(g, g.dealer, players);
   const big = after(g, small.seat, players);
-  pay(small, g.settings.small);
-  pay(big, g.settings.big);
+  pay(g, small, g.settings.small);
+  pay(g, big, g.settings.big);
   log(g, `Раздача #${g.hand} · блайнды ${g.settings.small}/${g.settings.big}`);
   advance(g, big.seat, now);
 }
@@ -143,6 +152,7 @@ export function settle(g: Game) {
   for (const [id, n] of gains) {
     const p = g.players.find((p) => p.id === id)!;
     p.chips += n;
+    transfer(g, p, n, "payout");
     const label =
       candidates.length > 1
         ? ` · ${combinations[evaluate([...p.cards, ...g.board])[0]]}`
@@ -213,7 +223,7 @@ export function action(
     log(g, `${p.name}: чек`);
   } else if (kind === "call") {
     if (!call) throw Error("Ставки нет — можно сделать чек");
-    pay(p, call);
+    pay(g, p, call);
     log(g, `${p.name}: колл ${p.bet}`);
   } else if (kind === "raise") {
     if (g.acted.includes(id))
@@ -233,7 +243,7 @@ export function action(
       g.minRaise = increase;
       g.acted = [];
     }
-    pay(p, amount! - p.bet);
+    pay(g, p, amount! - p.bet);
     g.currentBet = amount!;
     log(g, `${p.name}: ${p.chips === 0 ? "олл-ин" : "рейз"} до ${amount}`);
   } else throw Error("Неизвестное действие");

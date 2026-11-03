@@ -1,38 +1,11 @@
 import React, { useEffect, useState } from "react";
-import type { Card as PlayingCard, View } from "../shared/types";
+import type { View } from "../shared/types";
 import "./style.css";
 import { useGameSounds } from "./useGameSounds";
+import { Card } from "./Card";
+import { PokerTable } from "./PokerTable";
+import { CombinationsPanel } from "./CombinationsPanel";
 const format = (n: number) => n.toLocaleString("ru-RU");
-function Card({
-  card,
-  back = false,
-  small = false,
-}: {
-  card?: PlayingCard;
-  back?: boolean;
-  small?: boolean;
-}) {
-  return (
-    <div
-      className={`card ${small ? "small" : ""} ${back ? "back" : ""} ${card && ["h", "d"].includes(card.suit) ? "red" : ""} ${!card && !back ? "empty" : ""}`}
-    >
-      {card ? (
-        <>
-          <b>
-            {({ 11: "J", 12: "Q", 13: "K", 14: "A" } as Record<number, string>)[
-              card.rank
-            ] ?? card.rank}
-          </b>
-          <span>{{ s: "♠", h: "♥", d: "♦", c: "♣" }[card.suit]}</span>
-        </>
-      ) : back ? (
-        <span>✦</span>
-      ) : (
-        <span>·</span>
-      )}
-    </div>
-  );
-}
 export default function App() {
   const [g, setG] = useState<View | null>(null),
     [error, setError] = useState(""),
@@ -48,7 +21,24 @@ export default function App() {
     [settings, setSettings] = useState<View["settings"] | null>(null),
     [give, setGive] = useState(1000),
     [recipient, setRecipient] = useState("");
+  const [menuHidden, setMenuHidden] = useState(() => {
+    try {
+      const saved = localStorage.getItem("office-poker:menu");
+      return saved ? saved === "hidden" : window.innerWidth < 900;
+    } catch {
+      return false;
+    }
+  });
+  const [showCombinations, setShowCombinations] = useState(false);
   const sound = useGameSounds(g);
+  function toggleMenu() {
+    setMenuHidden((hidden) => {
+      try {
+        localStorage.setItem("office-poker:menu", hidden ? "open" : "hidden");
+      } catch {}
+      return !hidden;
+    });
+  }
   useEffect(() => {
     let alive = true;
     const load = () =>
@@ -124,8 +114,15 @@ export default function App() {
     showdown: "Раздача завершена",
   }[g.phase];
   return (
-    <div className="app">
-      <aside className="sidebar">
+    <div className={`app ${menuHidden ? "menu-collapsed" : ""}`}>
+      <aside className="sidebar" id="main-menu" aria-label="Главное меню">
+        <button
+          className="sidebar-close"
+          onClick={toggleMenu}
+          aria-label="Скрыть меню"
+        >
+          ‹
+        </button>
         <a className="brand" href="/">
           ♠
           <span>
@@ -165,12 +162,36 @@ export default function App() {
           <small>Никаких ставок на деньги</small>
         </div>
       </aside>
+      {!menuHidden && (
+        <button
+          className="menu-scrim"
+          aria-label="Закрыть меню"
+          onClick={toggleMenu}
+        />
+      )}
       <main>
         <header>
-          <div className="breadcrumbs">
-            НАШ ОФИС <span>/</span> ПОКЕРНЫЙ КЛУБ
+          <div className="header-left">
+            <button
+              className="menu-toggle"
+              onClick={toggleMenu}
+              aria-label={menuHidden ? "Показать меню" : "Скрыть меню"}
+              aria-expanded={!menuHidden}
+              aria-controls="main-menu"
+            >
+              ☰
+            </button>
+            <div className="breadcrumbs">
+              НАШ ОФИС <span>/</span> ПОКЕРНЫЙ КЛУБ
+            </div>
           </div>
           <div className="profile">
+            <button
+              className="combinations-button"
+              onClick={() => setShowCombinations(true)}
+            >
+              ♠ <span>Комбинации</span>
+            </button>
             <button
               className="sound-toggle"
               onClick={sound.toggle}
@@ -217,118 +238,7 @@ export default function App() {
           <>
             <div className="game-layout">
               <section className="game-area">
-                <div className="table-topline">
-                  <span>
-                    NO LIMIT HOLD’EM <b>·</b> {format(g.settings.small)} /{" "}
-                    {format(g.settings.big)}
-                  </span>
-                  <span>РАЗДАЧА #{String(g.hand).padStart(3, "0")}</span>
-                </div>
-                <div className="table-scene">
-                  <div className="felt">
-                    <div className="felt-inner">
-                      <div className="table-wordmark">
-                        после дейли<span>OFFICE POKER CLUB</span>
-                      </div>
-                      <div className="pot">
-                        <small>
-                          {g.phase === "showdown"
-                            ? "ИТОГ РАЗДАЧИ"
-                            : "ОБЩИЙ БАНК"}
-                        </small>
-                        <strong>
-                          {g.phase === "showdown"
-                            ? "✦"
-                            : `◉ ${format(g.players.reduce((n, p) => n + p.total, 0))}`}
-                        </strong>
-                      </div>
-                      <div className="community">
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <Card key={i} card={g.board[i]} />
-                        ))}
-                      </div>
-                      <span className="stage">{stage}</span>
-                    </div>
-                  </div>
-                  {Array.from({ length: 6 }, (_, seat) => {
-                    const p = g.players.find((p) => p.seat === seat);
-                    return (
-                      <div
-                        key={seat}
-                        className={`seat seat-${seat} ${p?.id === g.actor ? "acting" : ""} ${p?.folded && inHand ? "folded" : ""}`}
-                      >
-                        {p ? (
-                          <>
-                            <div className="seat-cards">
-                              {p.cards.length ? (
-                                p.cards.map((c, i) => (
-                                  <Card key={i} card={c} small />
-                                ))
-                              ) : inHand && !p.folded ? (
-                                <>
-                                  <Card back small />
-                                  <Card back small />
-                                </>
-                              ) : null}
-                            </div>
-                            <div className="player">
-                              <span className={`avatar color-${seat}`}>
-                                {p.bot
-                                  ? "🤖"
-                                  : p.name.slice(0, 1).toUpperCase()}
-                              </span>
-                              <div>
-                                <b>
-                                  {p.name}
-                                  {p.id === g.me
-                                    ? " · вы"
-                                    : p.bot
-                                      ? " · бот"
-                                      : ""}
-                                </b>
-                                <span>◉ {format(p.chips)}</span>
-                              </div>
-                              {g.dealer === seat && <i className="dealer">D</i>}
-                            </div>
-                            {inHand && (
-                              <span className="seat-info">
-                                {p.folded
-                                  ? "Пас"
-                                  : p.chips === 0
-                                    ? "Олл-ин"
-                                    : p.id === g.actor
-                                      ? "Думает…"
-                                      : p.bet
-                                        ? `В игре: ${format(p.bet)}`
-                                        : "За столом"}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <div className="empty-seat">
-                            <span>+</span>Свободное место
-                            {g.admin && !inHand && (
-                              <button
-                                className="seat-bot"
-                                disabled={busy}
-                                aria-label={`Посадить бота на место ${seat + 1}`}
-                                onClick={() => send("bot", { seat })}
-                              >
-                                + Бот
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="table-footer">
-                  <span>
-                    ♧ Без спешки. У вас есть {g.settings.minutes} мин. на ход.
-                  </span>
-                  <span>Сохранение автоматически</span>
-                </div>
+                <PokerTable game={g} busy={busy} send={send} />
               </section>
               <aside className="activity">
                 <div className="panel-title">
@@ -407,7 +317,10 @@ export default function App() {
                 </button>
               </form>
             ) : (
-              <section className="action-bar">
+              <section
+                className={`action-bar ${myTurn ? "your-turn" : ""}`}
+                aria-label="Ваши действия"
+              >
                 <div className="your-hand">
                   <div className="hand-cards">
                     {me.cards.length ? (
@@ -417,7 +330,7 @@ export default function App() {
                     )}
                   </div>
                   <div>
-                    <small>ВАШ СТЕК</small>
+                    <small>{myTurn ? "ВАШ ХОД" : "ВАШ СТЕК"}</small>
                     <strong>◉ {format(me.chips)}</strong>
                     <span>
                       {myTurn
@@ -433,10 +346,24 @@ export default function App() {
                 {inHand ? (
                   <div className="controls">
                     <div className="raise-control">
-                      <label htmlFor="raise">Повысить до</label>
+                      <div className="raise-heading">
+                        <label htmlFor="raise-slider">Рейз до</label>
+                        <input
+                          id="raise-amount"
+                          aria-label="Точная сумма рейза"
+                          type="number"
+                          min={Math.min(g.legal.min, g.legal.max)}
+                          max={g.legal.max}
+                          step="1"
+                          value={amount}
+                          disabled={!myTurn || !g.legal.canRaise || busy}
+                          onChange={(e) => setRaise(Number(e.target.value))}
+                        />
+                      </div>
                       <input
-                        id="raise"
-                        type="number"
+                        id="raise-slider"
+                        aria-label="Размер рейза"
+                        type="range"
                         min={Math.min(g.legal.min, g.legal.max)}
                         max={g.legal.max}
                         step="1"
@@ -444,19 +371,55 @@ export default function App() {
                         disabled={!myTurn || !g.legal.canRaise || busy}
                         onChange={(e) => setRaise(Number(e.target.value))}
                       />
-                      <button
-                        disabled={!myTurn || !g.legal.canRaise || busy}
-                        onClick={() => setRaise(g.legal.max)}
-                      >
-                        Олл-ин
-                      </button>
+                      <div className="raise-presets">
+                        {[
+                          { label: "Мин.", value: g.legal.min },
+                          {
+                            label: "½ банка",
+                            value:
+                              g.currentBet +
+                              Math.round(
+                                (g.players.reduce((n, p) => n + p.total, 0) +
+                                  g.legal.call) *
+                                  0.5,
+                              ),
+                          },
+                          {
+                            label: "Банк",
+                            value:
+                              g.currentBet +
+                              g.players.reduce((n, p) => n + p.total, 0) +
+                              g.legal.call,
+                          },
+                          { label: "Олл-ин", value: g.legal.max },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            disabled={!myTurn || !g.legal.canRaise || busy}
+                            onClick={() =>
+                              setRaise(
+                                Math.min(
+                                  g.legal.max,
+                                  Math.max(g.legal.min, preset.value),
+                                ),
+                              )
+                            }
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="action-buttons">
                       <button
+                        className="fold-button"
                         disabled={!myTurn || busy}
                         onClick={() => send("action", { kind: "fold" })}
                       >
-                        Пас
+                        <span className="action-icon">×</span>
+                        <span>
+                          Пас<small>Сбросить карты</small>
+                        </span>
                       </button>
                       <button
                         disabled={!myTurn || busy}
@@ -466,7 +429,19 @@ export default function App() {
                           })
                         }
                       >
-                        {g.legal.call ? `Колл ${format(g.legal.call)}` : "Чек"}
+                        <span className="action-icon">
+                          {g.legal.call ? "=" : "✓"}
+                        </span>
+                        <span>
+                          {g.legal.call
+                            ? `Колл ${format(g.legal.call)}`
+                            : "Чек"}
+                          <small>
+                            {g.legal.call
+                              ? "Уравнять ставку"
+                              : "Продолжить без ставки"}
+                          </small>
+                        </span>
                       </button>
                       <button
                         className="primary"
@@ -475,7 +450,15 @@ export default function App() {
                           send("action", { kind: "raise", amount })
                         }
                       >
-                        Рейз {format(amount)}
+                        <span className="action-icon">↗</span>
+                        <span>
+                          Рейз {format(amount)}
+                          <small>
+                            {amount === g.legal.max
+                              ? "Все фишки в игру"
+                              : "Повысить ставку"}
+                          </small>
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -650,6 +633,13 @@ export default function App() {
           </div>
         )}
       </main>
+      {showCombinations && (
+        <CombinationsPanel
+          hole={me?.cards ?? []}
+          board={g.board}
+          onClose={() => setShowCombinations(false)}
+        />
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ export type ChipTransfer = {
   kind: "bet" | "payout";
 };
 export type DealPresentation = {
+  holeMode?: "rounds" | "pairs";
   timing?: { interval: number; flight: number; flip: number; lead: number };
   id: number;
   hand: number;
@@ -31,7 +32,24 @@ export type DealPresentation = {
   pausedAt?: number;
 };
 export type CheckEvent = { id: number; hand: number; seat: number };
+export type HandWinner = {
+  id: string;
+  name: string;
+  seat: number;
+  amount: number;
+  combination: string | null;
+  cards: Card[];
+  boardIndexes: number[];
+  holeIndexes: number[];
+};
+export type HandResult = {
+  hand: number;
+  byFold: boolean;
+  winners: HandWinner[];
+  previousWinnerIds: string[];
+};
 export type Game = {
+  lastResult?: HandResult;
   checkSeq?: number;
   checks?: CheckEvent[];
   deal?: DealPresentation;

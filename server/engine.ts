@@ -1,5 +1,6 @@
 import type { Game, Player, View } from "../shared/types.js";
 import { deck, evaluate, compare, combinations } from "./poker.js";
+import { bestFive } from "../shared/poker.js";
 import {
   cardMoves,
   dealOrder,
@@ -96,6 +97,7 @@ function turn(g: Game, p: Player, now: number) {
 function present(g: Game, hole: boolean, boardFrom: number, now: number) {
   if (!g.dealAnimations || (!hole && boardFrom === g.board.length)) return;
   const plan = {
+    holeMode: "pairs" as const,
     timing: {
       interval: CARD_INTERVAL,
       flight: CARD_FLIGHT,
@@ -150,9 +152,10 @@ export function start(g: Game, now = Date.now(), animate = false) {
     players.map((p) => p.seat),
     g.dealer,
   );
-  for (let round = 0; round < 2; round++)
-    for (const seat of order)
-      g.players.find((p) => p.seat === seat)!.cards.push(g.deck.pop()!);
+  for (const seat of order)
+    g.players
+      .find((p) => p.seat === seat)!
+      .cards.push(g.deck.pop()!, g.deck.pop()!);
   const small =
     players.length === 2
       ? players.find((p) => p.seat === g.dealer)!
@@ -171,9 +174,10 @@ export function settle(g: Game) {
   ].sort((a, b) => a - b);
   let previous = 0;
   const gains = new Map<string, number>();
+  const winningIds = new Set<string>();
   for (const level of levels) {
-    const pot =
-      (level - previous) * g.players.filter((p) => p.total >= level).length;
+    const contributors = g.players.filter((p) => p.total >= level);
+    const pot = (level - previous) * contributors.length;
     previous = level;
     let eligible =
       candidates.length === 1
@@ -190,6 +194,7 @@ export function settle(g: Game) {
         .filter((s) => compare(s.score, scores[0].score) === 0)
         .map((s) => s.p);
     }
+    if (contributors.length > 1) for (const p of eligible) winningIds.add(p.id);
     eligible.sort(
       (a, b) => ((a.seat - g.dealer + 5) % 6) - ((b.seat - g.dealer + 5) % 6),
     );
@@ -203,12 +208,45 @@ export function settle(g: Game) {
     const p = g.players.find((p) => p.id === id)!;
     p.chips += n;
     transfer(g, p, n, "payout");
-    const label =
-      candidates.length > 1
-        ? ` · ${combinations[evaluate([...p.cards, ...g.board])[0]]}`
-        : "";
-    g.result.push(`${p.name} +${n}${label}`);
+    const score =
+      candidates.length > 1 ? evaluate([...p.cards, ...g.board]) : null;
+    const label = score
+      ? ` · ${score[0] === 8 && score[1] === 14 ? "Роял-флеш" : combinations[score[0]]}`
+      : "";
+    g.result.push(
+      winningIds.has(id)
+        ? `${p.name} +${n}${label}`
+        : `${p.name}: возврат ${n}`,
+    );
   }
+  const byFold = candidates.length === 1;
+  g.lastResult = {
+    hand: g.hand,
+    byFold,
+    previousWinnerIds: g.lastResult?.winners.map((w) => w.id) ?? [],
+    winners: [...winningIds].map((id) => {
+      const p = g.players.find((p) => p.id === id)!;
+      const best = byFold ? null : bestFive([...p.cards, ...g.board]);
+      const includes = (c: (typeof g.board)[number]) =>
+        best?.cards.some(
+          (card) => card.rank === c.rank && card.suit === c.suit,
+        ) ?? false;
+      return {
+        id: p.id,
+        name: p.name,
+        seat: p.seat,
+        amount: gains.get(id) ?? 0,
+        combination: best
+          ? best.score[0] === 8 && best.score[1] === 14
+            ? "Роял-флеш"
+            : combinations[best.score[0]]
+          : null,
+        cards: best?.cards ?? [],
+        boardIndexes: g.board.flatMap((c, i) => (includes(c) ? [i] : [])),
+        holeIndexes: p.cards.flatMap((c, i) => (includes(c) ? [i] : [])),
+      };
+    }),
+  };
   g.result.forEach((s) => log(g, s));
   g.phase = "showdown";
   g.actor = null;

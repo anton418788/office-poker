@@ -61,3 +61,22 @@ export const combinations = [
   "Каре",
   "Стрит-флеш",
 ];
+
+/** Return the actual five-card hand for showdown, including its kickers. */
+export function bestFive(cards: Card[]): { cards: Card[]; score: number[] } {
+  let best: Card[] = [],
+    score: number[] = [];
+  for (let a = 0; a < cards.length - 4; a++)
+    for (let b = a + 1; b < cards.length - 3; b++)
+      for (let c = b + 1; c < cards.length - 2; c++)
+        for (let d = c + 1; d < cards.length - 1; d++)
+          for (let e = d + 1; e < cards.length; e++) {
+            const hand = [cards[a], cards[b], cards[c], cards[d], cards[e]],
+              value = five(hand);
+            if (compare(value, score) > 0) {
+              best = hand;
+              score = value;
+            }
+          }
+  return { cards: best, score };
+}

@@ -37,9 +37,16 @@ export function useDealPresentation(
       last.current.startedAt = plan.startedAt;
     }
     if (!game.paused) {
+      const sounded = new Set<number>();
       for (const move of cardMoves(plan)) {
-        if (last.current.clock < move.start && move.start <= frame.clock)
+        if (
+          last.current.clock < move.start &&
+          move.start <= frame.clock &&
+          !sounded.has(move.start)
+        ) {
           play("deal");
+          sounded.add(move.start);
+        }
         if (
           move.kind === "board" &&
           last.current.clock < move.flip &&

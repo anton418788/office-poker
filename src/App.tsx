@@ -4,6 +4,8 @@ import "./style.css";
 import "./themes.css";
 import { useGameSounds } from "./useGameSounds";
 import { Card } from "./Card";
+import { WinnerCrown } from "./WinnerCrown";
+import { crownWinners } from "../shared/winners";
 import { PokerTable } from "./PokerTable";
 import { TableSidebar } from "./TableSidebar";
 import { useDealPresentation } from "./useDealPresentation";
@@ -120,6 +122,7 @@ export default function App() {
     return (
       <div className="loading">✦ Собираем стол…{error && <p>{error}</p>}</div>
     );
+  const crowns = crownWinners(g, presentation.active);
   const timer = g.paused
     ? "ПАУЗА"
     : g.deadline
@@ -238,6 +241,7 @@ export default function App() {
             </button>
             <span className="avatar tiny">
               {me?.name.slice(0, 1).toUpperCase() ?? "?"}
+              {crowns.includes(g.me) && <WinnerCrown />}
             </span>
             {me?.name ?? "Наблюдатель"}
             {g.admin && <span className="badge">Хост</span>}

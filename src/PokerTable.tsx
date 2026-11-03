@@ -8,6 +8,8 @@ import {
 import type { ChipTransfer, View } from "../shared/types";
 import { denominations, chipBreakdown } from "../shared/chips";
 import { Card } from "./Card";
+import { WinnerCrown } from "./WinnerCrown";
+import { crownWinners } from "../shared/winners";
 import { Chip, ChipPile } from "./ChipPile";
 import type { useDealPresentation } from "./useDealPresentation";
 const format = (n: number) => n.toLocaleString("ru-RU");
@@ -130,6 +132,21 @@ export function PokerTable({
     return () => clearInterval(timer);
   }, [g.paused, flights.length > 0]);
   const pot = g.players.reduce((n, p) => n + p.total, 0);
+  const crowns = crownWinners(g, presentation.active);
+  const shownResult =
+    g.phase === "showdown" &&
+    !presentation.active &&
+    g.lastResult?.hand === g.hand
+      ? g.lastResult
+      : null;
+  const winningBoard = new Set(
+    shownResult?.winners.flatMap((w) => w.boardIndexes) ?? [],
+  );
+  const summaries = new Map<string, string[]>();
+  for (const winner of shownResult?.winners ?? []) {
+    const label = winner.combination ?? "Победа без вскрытия";
+    summaries.set(label, [...(summaries.get(label) ?? []), winner.name]);
+  }
   const inFlightPot = flights
     .filter((f) => f.kind === "payout")
     .reduce((sum, f) => sum + f.amount, 0);
@@ -144,7 +161,7 @@ export function PokerTable({
       </div>
       <div
         ref={sceneRef}
-        className={`table-scene ${g.hand > 0 ? "card-hand" : ""} ${g.paused ? "is-paused" : ""}`}
+        className={`table-scene ${g.hand > 0 ? "card-hand" : ""} ${g.paused ? "is-paused" : ""} ${shownResult ? "has-showdown" : ""}`}
       >
         <div className="felt">
           <div className="felt-inner">
@@ -160,7 +177,7 @@ export function PokerTable({
               {Array.from({ length: 5 }, (_, i) => (
                 <div
                   key={`${g.hand}-${i}`}
-                  className={`board-slot ${g.deal && i >= g.deal.boardFrom && i < presentation.boardFaces ? "board-revealed" : ""}`}
+                  className={`board-slot ${winningBoard.has(i) ? "winning-board-card" : ""} ${g.deal && i >= g.deal.boardFrom && i < presentation.boardFaces ? "board-revealed" : ""}`}
                 >
                   <Card
                     card={i < presentation.boardFaces ? g.board[i] : undefined}
@@ -172,17 +189,34 @@ export function PokerTable({
                 </div>
               ))}
             </div>
-            <span className="stage">
-              {presentation.active
-                ? g.deal?.hole
-                  ? "Дилер раздаёт карты"
-                  : "Открываем борд"
-                : stages[g.phase]}
-            </span>
+            {shownResult && shownResult.winners.length > 0 ? (
+              <div
+                className="showdown-caption"
+                role="status"
+                aria-label="Выигрышная комбинация"
+              >
+                {[...summaries].map(([label, names]) => (
+                  <div className="winner-line" key={label}>
+                    <strong>{label}</strong>
+                    <span>{names.join(" · ")}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="stage">
+                {presentation.active
+                  ? g.deal?.hole
+                    ? "Дилер раздаёт карты"
+                    : "Открываем борд"
+                  : stages[g.phase]}
+              </span>
+            )}
           </div>
         </div>
         {locations.map(([x, y], seat) => {
           const p = g.players.find((p) => p.seat === seat);
+          const winningHole =
+            shownResult?.winners.find((w) => w.id === p?.id)?.holeIndexes ?? [];
           const visibleChips = p
             ? Math.max(
                 0,
@@ -214,7 +248,14 @@ export function PokerTable({
                     {p.cards.length
                       ? p.cards
                           .slice(0, presentation.holeCount(seat))
-                          .map((c, i) => <Card key={i} card={c} small />)
+                          .map((c, i) => (
+                            <div
+                              key={i}
+                              className={`pocket-slot ${winningHole.includes(i) ? "winning-pocket-card" : ""}`}
+                            >
+                              <Card card={c} small />
+                            </div>
+                          ))
                       : inHand && !p.folded
                         ? Array.from(
                             { length: presentation.holeCount(seat) },
@@ -225,6 +266,7 @@ export function PokerTable({
                   <div className="player">
                     <span className={`avatar color-${seat}`}>
                       {p.bot ? "🤖" : p.name.slice(0, 1).toUpperCase()}
+                      {crowns.includes(p.id) && <WinnerCrown />}
                     </span>
                     <div>
                       <b title={p.name}>
@@ -337,7 +379,7 @@ export function PokerTable({
                 style={{
                   left: `${origin[0] + (target[0] - origin[0]) * ease}%`,
                   top: `${origin[1] + (target[1] - origin[1]) * ease - Math.sin(Math.PI * t) * 5}%`,
-                  transform: `translate(-50%,-50%) rotate(${-12 + Math.sin(t * Math.PI) * 20}deg)`,
+                  transform: `translate(-50%,-50%) rotate(${-12 + Math.sin(t * Math.PI) * 20 + (move.kind === "hole" ? (move.index - 0.5) * 8 : 0)}deg)`,
                 }}
               >
                 <Card back small />

@@ -19,11 +19,16 @@ export function dealOrder(seats: number[], dealer: number) {
 }
 export function cardMoves(plan: DealPresentation): CardMove[] {
   const moves: CardMove[] = [];
-  const add = (kind: "hole" | "board", seat: number, index: number) => {
+  const add = (
+    kind: "hole" | "board",
+    seat: number,
+    index: number,
+    slot = moves.length,
+  ) => {
     const start =
       plan.startedAt +
       (plan.timing?.lead ?? DEAL_LEAD) +
-      moves.length * (plan.timing?.interval ?? CARD_INTERVAL);
+      slot * (plan.timing?.interval ?? CARD_INTERVAL);
     const land = start + (plan.timing?.flight ?? CARD_FLIGHT);
     moves.push({
       key: `${plan.id}-${kind}-${seat}-${index}`,
@@ -35,10 +40,23 @@ export function cardMoves(plan: DealPresentation): CardMove[] {
       flip: land + (kind === "board" ? (plan.timing?.flip ?? CARD_FLIP) : 0),
     });
   };
-  if (plan.hole)
-    for (let round = 0; round < 2; round++)
-      for (const seat of plan.seats) add("hole", seat, round);
-  for (let i = plan.boardFrom; i < plan.boardTo; i++) add("board", -1, i);
+  if (plan.hole) {
+    if (plan.holeMode === "pairs")
+      plan.seats.forEach((seat, slot) => {
+        add("hole", seat, 0, slot);
+        add("hole", seat, 1, slot);
+      });
+    else
+      for (let round = 0; round < 2; round++)
+        for (const seat of plan.seats) add("hole", seat, round);
+  }
+  const boardOffset = plan.hole
+    ? plan.holeMode === "pairs"
+      ? plan.seats.length
+      : plan.seats.length * 2
+    : 0;
+  for (let i = plan.boardFrom; i < plan.boardTo; i++)
+    add("board", -1, i, boardOffset + i - plan.boardFrom);
   return moves;
 }
 export function isDealing(g: Pick<Game, "deal" | "hand">, now = Date.now()) {

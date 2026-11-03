@@ -23,7 +23,7 @@ function table(n = 3) {
   for (let i = 0; i < n; i++) join(g, `${i}`, `Игрок ${i}`, i);
   return g;
 }
-test("Дилер раздаёт по часовой стрелке два круга, по одной карте за раз", () => {
+test("Дилер раздаёт по часовой стрелке сразу по две карты", () => {
   const g = table();
   start(g, 100, true);
   const plan = g.deal!,
@@ -33,10 +33,10 @@ test("Дилер раздаёт по часовой стрелке два кру
     moves.map((m) => [m.seat, m.index]),
     [
       [1, 0],
-      [2, 0],
-      [0, 0],
       [1, 1],
+      [2, 0],
       [2, 1],
+      [0, 0],
       [0, 1],
     ],
   );
@@ -44,14 +44,16 @@ test("Дилер раздаёт по часовой стрелке два кру
     moves.every(
       (m, i) =>
         m.land - m.start === CARD_FLIGHT &&
-        (!i || m.start > moves[i - 1].start),
+        (!i || m.start >= moves[i - 1].start),
     ),
   );
   const all = [...g.deck, ...g.players.flatMap((p) => p.cards)];
   assert.equal(all.length, 52);
   assert.equal(new Set(all.map((c) => `${c.rank}${c.suit}`)).size, 52);
   const first = dealFrame(plan, g.hand, 0, moves[0].land);
-  assert.equal(first.holeCount(1), 1);
+  assert.equal(first.holeCount(1), 2);
+  assert.equal(moves[0].start, moves[1].start);
+  assert.ok(moves[2].start > moves[1].start);
   assert.equal(first.holeCount(0), 0);
   const full = dealFrame(plan, g.hand, 0, plan.endsAt);
   assert.ok(g.players.every((p) => full.holeCount(p.seat) === 2));
@@ -100,12 +102,12 @@ test("Пауза замораживает раздачу, продолжение
   const g = table();
   start(g, 0, true);
   const moves = cardMoves(g.deal!),
-    at = moves[1].land,
+    at = moves[2].land,
     originalEnd = g.deal!.endsAt;
   pause(g, at);
   const frozen = dealFrame(g.deal, g.hand, 0, at + 60000);
-  assert.equal(frozen.holeCount(1), 1);
-  assert.equal(frozen.holeCount(2), 1);
+  assert.equal(frozen.holeCount(1), 2);
+  assert.equal(frozen.holeCount(2), 2);
   assert.equal(frozen.holeCount(0), 0);
   assert.equal(step(g, at + 60000), false);
   pause(g, at + 60000);
@@ -113,7 +115,7 @@ test("Пауза замораживает раздачу, продолжение
   assert.equal(g.deadline, g.deal!.endsAt + g.settings.minutes * 60000);
   const resumed = dealFrame(g.deal, g.hand, 0, at + 60000);
   assert.equal(resumed.holeCount(0), 0);
-  assert.equal(resumed.holeCount(2), 1);
+  assert.equal(resumed.holeCount(2), 2);
 });
 test("Сохранённая раздача продолжается с нужного места; план не раскрывает чужие карты", () => {
   const g = table();
@@ -126,7 +128,7 @@ test("Сохранённая раздача продолжается с нужн
   );
   assert.equal(
     dealFrame(copy.deal, copy.hand, 0, moves[3].land).holeCount(0),
-    1,
+    0,
   );
   const publicState = view(copy, "0", false);
   assert.equal(publicState.players[1].cards.length, 0);

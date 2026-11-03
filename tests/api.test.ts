@@ -10,8 +10,12 @@ import { join as pathJoin } from "node:path";
 import { tokenHash } from "../server/accounts.js";
 const password = "test-password-123";
 const rules = { small: 10, big: 20, minutes: 10, step: 10 };
-async function open(path = ":memory:", now?: () => number) {
-  const instance = createApp(path, { now }),
+async function open(
+  path = ":memory:",
+  now?: () => number,
+  caseRoll?: () => number,
+) {
+  const instance = createApp(path, { now, caseRoll }),
     server = instance.app.listen(0, "127.0.0.1");
   await new Promise<void>((r) => server.once("listening", r));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -761,5 +765,282 @@ test("Сидушка следует за аккаунтом; рубашка ди
   } finally {
     await s.close();
     rmSync(dir, { recursive: true });
+  }
+});
+
+test("Кейсы: пусто, новый предмет и компенсации 50/250/500; подмена цены и дропа игнорируется", async () => {
+  const rolls = [0, 7900, 7900, 9400, 9400, 9900, 9900];
+  let index = 0;
+  const s = await open(":memory:", undefined, () => rolls[index++]);
+  try {
+    const admin = await s.setup(),
+      player = await s.add(admin, "case_player", 10000);
+    const expected = [9500, 9000, 8550, 8050, 7800, 7300, 7300];
+    for (let i = 0; i < rolls.length; i++) {
+      const response = await s.call(player.cookie, "shop/open", {
+        caseId: "chairs",
+        requestId: `opening-request-${i}`,
+        cost: 0,
+        compensation: 1000000,
+        itemId: "chair-royal",
+        roll: 9999,
+      });
+      assert.equal(response.status, 200, JSON.stringify(response.data));
+      assert.equal(response.data.account.balance, expected[i]);
+      assert.equal(response.data.caseOpening.cost, 500);
+      const result = response.data.caseOpening;
+      if (i === 0) {
+        assert.equal(result.itemId, null);
+        assert.equal(result.compensation, 0);
+        assert.equal(result.duplicate, false);
+      } else {
+        assert.equal(
+          result.itemId,
+          i < 3 ? "chair-burgundy" : i < 5 ? "chair-ocean" : "chair-royal",
+        );
+        assert.equal(result.duplicate, i % 2 === 0);
+        assert.equal(
+          result.compensation,
+          i % 2 === 0 ? (i === 2 ? 50 : i === 4 ? 250 : 500) : 0,
+        );
+      }
+    }
+    const state = (await s.call(player.cookie, "state")).data;
+    assert.equal(state.inventory.owned.length, 5);
+    assert.equal(state.inventory.equipped.chair, "chair-classic");
+    assert.equal(
+      (
+        await s.call(player.cookie, "inventory/equip", {
+          slot: "chair",
+          itemId: "chair-royal",
+        })
+      ).status,
+      200,
+    );
+    assert.equal((await s.call(player.cookie, "shop/openings")).data.length, 7);
+    assert.equal((await s.call(admin, "shop/openings")).data.length, 0);
+    assert.equal(
+      (
+        await s.call("", "shop/open", {
+          caseId: "chairs",
+          requestId: "anonymous-request-1",
+        })
+      ).status,
+      401,
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+test("Открытие кейса атомарно меняет свободный стек, запрещено во время раздачи, повтор безопасен", async () => {
+  let time = 1_800_000_000_000,
+    rolls = 0;
+  const s = await open(
+    ":memory:",
+    () => time,
+    () => {
+      rolls++;
+      return 7900;
+    },
+  );
+  try {
+    const admin = await s.setup(),
+      player = await s.add(admin, "seated_buyer", 2000),
+      room = await s.create(player.cookie),
+      id = room.room.id;
+    await s.call(player.cookie, `rooms/${id}/bot`, { seat: 1 });
+    const first = await s.call(player.cookie, "shop/open", {
+      caseId: "decks",
+      requestId: "seated-opening-01",
+    });
+    assert.equal(first.status, 200);
+    assert.equal(
+      first.data.activeRoom.players.find((p: any) => p.id === player.user.id)
+        .chips,
+      1500,
+    );
+    assert.equal(first.data.account.balance, 1500);
+    const start = (await s.call(player.cookie, `rooms/${id}/start`, {})).data
+      .room;
+    const balance = (await s.call(player.cookie, "state")).data.account.balance;
+    assert.equal(
+      (
+        await s.call(player.cookie, "shop/open", {
+          caseId: "chairs",
+          requestId: "seated-opening-02",
+        })
+      ).status,
+      400,
+    );
+    const replay = await s.call(player.cookie, "shop/open", {
+      caseId: "decks",
+      requestId: "seated-opening-01",
+    });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.data.account.balance, balance);
+    assert.equal(rolls, 1);
+    assert.equal(
+      (
+        await s.call(player.cookie, "shop/open", {
+          caseId: "chairs",
+          requestId: "seated-opening-01",
+        })
+      ).status,
+      409,
+    );
+    time = start.deal.endsAt + 1;
+    await s.call(player.cookie, `rooms/${id}/action`, { kind: "fold" });
+    const before = (await s.call(player.cookie, "state")).data.account.balance;
+    const second = await s.call(player.cookie, "shop/open", {
+      caseId: "decks",
+      requestId: "seated-opening-02",
+    });
+    assert.equal(second.data.account.balance, before - 450);
+    assert.equal(second.data.caseOpening.duplicate, true);
+    await s.call(player.cookie, `rooms/${id}/leave`, {});
+    assert.equal(
+      (await s.call(player.cookie, "state")).data.account.balance,
+      before - 450,
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+test("Повтор открытия переживает перезапуск; история и предметы принадлежат аккаунту", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-cases-")),
+    path = pathJoin(dir, "game.sqlite");
+  let calls = 0,
+    s = await open(path, undefined, () => {
+      calls++;
+      return 9400;
+    });
+  try {
+    const admin = await s.setup(),
+      player = await s.add(admin, "persistent_buyer", 2000);
+    const first = (
+      await s.call(player.cookie, "shop/open", {
+        caseId: "decks",
+        requestId: "persistent-case-01",
+      })
+    ).data.caseOpening;
+    await s.call(player.cookie, "shop/open", {
+      caseId: "decks",
+      requestId: "persistent-case-02",
+    });
+    await s.close();
+    s = await open(path, undefined, () => {
+      calls++;
+      return 0;
+    });
+    const replay = await s.call(player.cookie, "shop/open", {
+      caseId: "decks",
+      requestId: "persistent-case-01",
+    });
+    assert.equal(replay.status, 200);
+    assert.deepEqual(replay.data.caseOpening, first);
+    assert.equal(replay.data.account.balance, 1250);
+    assert.equal(calls, 2);
+    const login = await s.call("", "login", {
+      login: "persistent_buyer",
+      password,
+    });
+    assert.ok(login.data.inventory.owned.includes("deck-garnet"));
+    assert.equal((await s.call(login.cookie!, "shop/openings")).data.length, 2);
+    assert.equal((await s.call(admin, "shop/openings")).data.length, 0);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("Параллельные открытия не тратят баланс дважды; недостаток фишек и неверные запросы не списывают", async () => {
+  let calls = 0;
+  const s = await open(":memory:", undefined, () => {
+    calls++;
+    return 0;
+  });
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "concurrent_a", 500),
+      b = await s.add(admin, "concurrent_b", 500);
+    const same = await Promise.all([
+      s.call(a.cookie, "shop/open", {
+        caseId: "chairs",
+        requestId: "concurrent-same-key",
+      }),
+      s.call(a.cookie, "shop/open", {
+        caseId: "chairs",
+        requestId: "concurrent-same-key",
+      }),
+    ]);
+    assert.deepEqual(
+      same.map((r) => r.status),
+      [200, 200],
+    );
+    assert.equal((await s.call(a.cookie, "state")).data.account.balance, 0);
+    const different = await Promise.all([
+      s.call(b.cookie, "shop/open", {
+        caseId: "decks",
+        requestId: "concurrent-key-01",
+      }),
+      s.call(b.cookie, "shop/open", {
+        caseId: "decks",
+        requestId: "concurrent-key-02",
+      }),
+    ]);
+    assert.deepEqual(different.map((r) => r.status).sort(), [200, 400]);
+    assert.equal((await s.call(b.cookie, "state")).data.account.balance, 0);
+    assert.equal(calls, 2);
+    assert.equal(
+      (
+        await s.call(a.cookie, "shop/open", {
+          caseId: "chairs",
+          requestId: "insufficient-key-01",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "shop/open", {
+          caseId: "unknown",
+          requestId: "invalid-case-key01",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "shop/open", {
+          caseId: "chairs",
+          requestId: "short",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(calls, 2);
+    assert.equal((await s.call(admin, "state")).data.account.balance, 2000);
+  } finally {
+    await s.close();
+  }
+});
+
+test("Администратор уже владеет всеми предметами: выпавший предмет даёт компенсацию", async () => {
+  const s = await open(":memory:", undefined, () => 9999);
+  try {
+    const admin = await s.setup();
+    const result = await s.call(admin, "shop/open", {
+      caseId: "decks",
+      requestId: "admin-exclusive-01",
+    });
+    assert.equal(result.data.caseOpening.itemId, "deck-ivory");
+    assert.equal(result.data.caseOpening.duplicate, true);
+    assert.equal(result.data.caseOpening.compensation, 500);
+    assert.equal(result.data.account.balance, 2000);
+    assert.equal(result.data.inventory.owned.length, 8);
+  } finally {
+    await s.close();
   }
 });

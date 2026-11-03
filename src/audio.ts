@@ -56,10 +56,24 @@ export function createAudioPlayer() {
       const ctx = context,
         output = master,
         start = ctx.currentTime + delay;
-      if (sound === "turn") {
+      if (sound === "case-tick") {
+        const oscillator = ctx.createOscillator(),
+          gain = ctx.createGain();
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(1700, start);
+        oscillator.frequency.exponentialRampToValueAtTime(650, start + 0.018);
+        gain.gain.setValueAtTime(0.065, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.018);
+        oscillator.connect(gain);
+        gain.connect(output);
+        oscillator.start(start);
+        oscillator.stop(start + 0.02);
+        return;
+      }
+      if (sound === "turn" || sound === "case-result") {
         for (const [offset, frequency] of [
-          [0, 523.25],
-          [0.13, 783.99],
+          [0, sound === "turn" ? 523.25 : 392],
+          [0.13, sound === "turn" ? 783.99 : 523.25],
         ]) {
           const osc = ctx.createOscillator(),
             gain = ctx.createGain();

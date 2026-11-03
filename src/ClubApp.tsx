@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClubState } from "../shared/types";
 import { GameScreen } from "./App";
+import { ShopPanel } from "./ShopPanel";
 import { InventoryPanel } from "./InventoryPanel";
 import { AccountsPanel } from "./AccountsPanel";
 import { useGameSounds } from "./useGameSounds";
@@ -9,6 +10,7 @@ import { ReturnToTable } from "./ReturnToTable";
 import { useTheme } from "./useTheme";
 import "./club.css";
 import "./cosmetics.css";
+import "./shop.css";
 const format = (n: number) => n.toLocaleString("ru-RU");
 const phaseNames = {
   waiting: "Ожидает игроков",
@@ -286,6 +288,10 @@ export default function ClubApp() {
             choose(null);
             setPage("lobby");
           }}
+          onShop={() => {
+            choose(null);
+            setPage("shop");
+          }}
           onInventory={() => {
             choose(null);
             setPage("inventory");
@@ -339,6 +345,14 @@ export default function ClubApp() {
           >
             {page === "inventory" ? "Все столы" : "Инвентарь"}
           </button>
+          <button
+            onClick={() => {
+              choose(null);
+              setPage(page === "shop" ? "lobby" : "shop");
+            }}
+          >
+            {page === "shop" ? "Все столы" : "Магазин"}
+          </button>
           {account.admin && (
             <button
               onClick={() => {
@@ -355,7 +369,23 @@ export default function ClubApp() {
         </div>
       </header>
       <main className="club-main">
-        {page === "inventory" && snapshot.inventory ? (
+        {page === "shop" ? (
+          <ShopPanel
+            key={account.id}
+            account={account}
+            activeRoom={active}
+            busy={busy}
+            error={error}
+            request={request}
+            sound={sound}
+            onBack={() => setPage("lobby")}
+            onInventory={() => setPage("inventory")}
+            onOpen={async (caseId, requestId) =>
+              (await perform("shop/open", { caseId, requestId }))
+                ?.caseOpening ?? null
+            }
+          />
+        ) : page === "inventory" && snapshot.inventory ? (
           <InventoryPanel
             inventory={snapshot.inventory}
             admin={account.admin}

@@ -22,6 +22,7 @@ export function GameScreen({
   onLobby,
   onAccounts,
   onInventory,
+  onShop,
   onLogout,
   design,
   sound,
@@ -34,6 +35,7 @@ export function GameScreen({
   onLobby: () => void;
   onAccounts: () => void;
   onInventory: () => void;
+  onShop: () => void;
   onLogout: () => void;
   design: ReturnType<typeof useTheme>;
   sound: ReturnType<typeof useGameSounds>;
@@ -140,6 +142,9 @@ export function GameScreen({
         <button className="nav" onClick={onInventory}>
           ♧ <span>Инвентарь</span>
         </button>
+        <button className="nav" onClick={onShop}>
+          ▣ <span>Магазин</span>
+        </button>
         {g.admin && (
           <button className="nav" onClick={onAccounts}>
             ⚙ <span>Аккаунты игроков</span>
@@ -147,7 +152,6 @@ export function GameScreen({
         )}
         <div className="soon">
           <span>Скоро в клубе</span>
-          <p>♧ Магазин скинов</p>
           <p>☺ Реакции за столом</p>
           <small>Сначала — хорошая партия.</small>
         </div>

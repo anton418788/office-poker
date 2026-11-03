@@ -5,7 +5,7 @@ import {
   type CosmeticSlot,
   type Inventory,
 } from "../shared/cosmetics";
-import { Card } from "./Card";
+import { CosmeticPreview } from "./CosmeticPreview";
 export function InventoryPanel({
   inventory,
   admin,
@@ -105,20 +105,7 @@ export function InventoryPanel({
                   className="inventory-preview"
                   aria-label={`Предпросмотр: ${item.name}`}
                 >
-                  {slot === "chair" ? (
-                    <div
-                      className="chair"
-                      data-chair={item.id}
-                      aria-hidden="true"
-                    >
-                      <i />
-                    </div>
-                  ) : (
-                    <div className="preview-deck">
-                      <Card back skin={item.id} />
-                      <Card back skin={item.id} />
-                    </div>
-                  )}
+                  <CosmeticPreview item={item} />
                   {!owned && (
                     <span className="inventory-lock" aria-label="Заблокировано">
                       🔒

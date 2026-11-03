@@ -1,3 +1,4 @@
+import type { CaseOpening } from "./cases";
 import type { Appearance, Inventory } from "./cosmetics";
 export type Card = { rank: number; suit: "s" | "h" | "d" | "c" };
 export type Player = {
@@ -125,4 +126,5 @@ export type ClubState = {
   room?: View;
   activeRoom?: View;
   inventory?: Inventory;
+  caseOpening?: CaseOpening;
 };

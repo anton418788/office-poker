@@ -1,4 +1,13 @@
 import {
+  CASE_PRICE,
+  CASE_ROLL_SIZE,
+  drawCase,
+  duplicateCompensation,
+  shopCase,
+  type CaseOpening,
+  type CaseId,
+} from "../shared/cases.js";
+import {
   cosmeticItems,
   cosmeticItem,
   defaultAppearance,
@@ -7,7 +16,7 @@ import {
   type Appearance,
 } from "../shared/cosmetics.js";
 import express from "express";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, randomInt } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import {
   createGame,
@@ -82,7 +91,10 @@ export function roomSettings(body: Record<string, unknown>): Game["settings"] {
     stack: Math.max(2000, (big as number) * 100),
   };
 }
-export function createApp(path: string, options: { now?: () => number } = {}) {
+export function createApp(
+  path: string,
+  options: { now?: () => number; caseRoll?: () => number } = {},
+) {
   const now = options.now ?? Date.now;
   const db = new DatabaseSync(path);
   db.exec(`PRAGMA journal_mode=WAL;
@@ -91,6 +103,8 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, json TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS user_items (userId TEXT NOT NULL, itemId TEXT NOT NULL, PRIMARY KEY(userId,itemId));
     CREATE TABLE IF NOT EXISTS user_equipment (userId TEXT PRIMARY KEY, chair TEXT NOT NULL, deck TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS case_openings (userId TEXT NOT NULL, requestId TEXT NOT NULL, caseId TEXT NOT NULL, json TEXT NOT NULL, openedAt INTEGER NOT NULL, PRIMARY KEY(userId,requestId));
+    CREATE INDEX IF NOT EXISTS case_openings_user_time ON case_openings(userId,openedAt DESC);
     CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   const transaction = (fn: () => void) => {
     db.exec("BEGIN IMMEDIATE");
@@ -453,6 +467,79 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     });
     if (next) rooms.set(next.id, next);
     res.json(state(res));
+  });
+  app.get("/api/shop/openings", requireUser, (_req, res) => {
+    const rows = db
+      .prepare(
+        "SELECT json FROM case_openings WHERE userId=? ORDER BY openedAt DESC,rowid DESC LIMIT 10",
+      )
+      .all(res.locals.account.id) as { json: string }[];
+    res.json(rows.map((row) => JSON.parse(row.json)));
+  });
+  app.post("/api/shop/open", requireUser, (req, res) => {
+    const u = user(res.locals.account.id)!;
+    const { caseId, requestId } = req.body ?? {};
+    if (!shopCase(caseId)) fail("Кейс не найден");
+    if (
+      typeof requestId !== "string" ||
+      !/^[a-zA-Z0-9_-]{16,80}$/.test(requestId)
+    )
+      fail("Некорректный номер открытия");
+    const previous = db
+      .prepare(
+        "SELECT caseId,json FROM case_openings WHERE userId=? AND requestId=?",
+      )
+      .get(u.id, requestId) as { caseId: string; json: string } | undefined;
+    if (previous) {
+      if (previous.caseId !== caseId)
+        fail("Этот номер открытия уже использован для другого кейса", 409);
+      res.json({ ...state(res), caseOpening: JSON.parse(previous.json) });
+      return;
+    }
+    const active = occupied(u.id);
+    if (active && (running(active.game) || isDealing(active.game, now())))
+      fail("Открывать кейсы за игровым балансом можно между раздачами");
+    if (u.balance < CASE_PRICE)
+      fail("Недостаточно фишек. Для открытия нужно 500.");
+    const item = drawCase(
+      caseId,
+      options.caseRoll ? options.caseRoll() : randomInt(CASE_ROLL_SIZE),
+    );
+    const duplicate = !!item && inventoryFor(u).owned.includes(item.id);
+    const compensation = duplicate && item ? duplicateCompensation(item) : 0;
+    const balance = u.balance - CASE_PRICE + compensation;
+    const opening: CaseOpening = {
+      id: requestId,
+      caseId: caseId as CaseId,
+      itemId: item?.id ?? null,
+      rarity: item?.rarity ?? null,
+      duplicate,
+      compensation,
+      cost: CASE_PRICE,
+      balanceAfter: balance,
+      openedAt: now(),
+    };
+    const next = active ? structuredClone(active) : null;
+    if (next) next.game.players.find((p) => p.id === u.id)!.chips = balance;
+    transaction(() => {
+      db.prepare("UPDATE users SET balance=? WHERE id=?").run(balance, u.id);
+      if (item && !duplicate)
+        db.prepare("INSERT INTO user_items VALUES(?,?)").run(u.id, item.id);
+      if (next)
+        db.prepare("UPDATE rooms SET json=? WHERE id=?").run(
+          JSON.stringify(next),
+          next.id,
+        );
+      db.prepare("INSERT INTO case_openings VALUES(?,?,?,?,?)").run(
+        u.id,
+        requestId,
+        caseId,
+        JSON.stringify(opening),
+        opening.openedAt,
+      );
+    });
+    if (next) rooms.set(next.id, next);
+    res.json({ ...state(res), caseOpening: opening });
   });
   app.get("/api/accounts", requireUser, requireAdmin, (_req, res) =>
     res.json(

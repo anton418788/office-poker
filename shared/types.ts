@@ -1,9 +1,11 @@
+import type { Appearance, Inventory } from "./cosmetics";
 export type Card = { rank: number; suit: "s" | "h" | "d" | "c" };
 export type Player = {
   id: string;
   name: string;
   seat: number;
   bot?: boolean;
+  appearance?: Appearance;
   chips: number;
   cards: Card[];
   folded: boolean;
@@ -54,6 +56,7 @@ export type HandResult = {
   previousWinnerIds: string[];
 };
 export type Game = {
+  cardBack?: string;
   lastResult?: HandResult;
   checkSeq?: number;
   checks?: CheckEvent[];
@@ -121,4 +124,5 @@ export type ClubState = {
   rooms: RoomSummary[];
   room?: View;
   activeRoom?: View;
+  inventory?: Inventory;
 };

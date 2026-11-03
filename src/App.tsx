@@ -21,6 +21,7 @@ export function GameScreen({
   error,
   onLobby,
   onAccounts,
+  onInventory,
   onLogout,
   design,
   sound,
@@ -32,6 +33,7 @@ export function GameScreen({
   error: string;
   onLobby: () => void;
   onAccounts: () => void;
+  onInventory: () => void;
   onLogout: () => void;
   design: ReturnType<typeof useTheme>;
   sound: ReturnType<typeof useGameSounds>;
@@ -134,6 +136,9 @@ export function GameScreen({
         <div className="side-label">ОФИСНЫЙ ПОКЕР</div>
         <button className="nav" onClick={onLobby}>
           ▦ <span>Все столы</span>
+        </button>
+        <button className="nav" onClick={onInventory}>
+          ♧ <span>Инвентарь</span>
         </button>
         {g.admin && (
           <button className="nav" onClick={onAccounts}>

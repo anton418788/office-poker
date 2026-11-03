@@ -1,15 +1,23 @@
+import { cosmeticItem, defaultAppearance } from "../shared/cosmetics";
 import type { Card as PlayingCard } from "../shared/types";
 export function Card({
   card,
   back = false,
   small = false,
+  skin = defaultAppearance.deck,
 }: {
   card?: PlayingCard;
   back?: boolean;
   small?: boolean;
+  skin?: string;
 }) {
   return (
     <div
+      data-card-back={
+        back
+          ? (cosmeticItem(skin, "deck")?.id ?? defaultAppearance.deck)
+          : undefined
+      }
       className={`card ${small ? "small" : ""} ${back ? "back" : ""} ${card && ["h", "d"].includes(card.suit) ? "red" : ""} ${!card && !back ? "empty" : ""}`}
     >
       {card ? (

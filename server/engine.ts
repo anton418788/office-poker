@@ -1,3 +1,4 @@
+import { normalizeAppearance } from "../shared/cosmetics.js";
 import type { Game, Player, View } from "../shared/types.js";
 import { deck, evaluate, compare, combinations } from "./poker.js";
 import { bestFive } from "../shared/poker.js";
@@ -135,6 +136,9 @@ export function start(g: Game, now = Date.now(), animate = false) {
     }
   g.dealAnimations = animate;
   g.dealer = after(g, g.dealer, players).seat;
+  g.cardBack = normalizeAppearance(
+    players.find((p) => p.seat === g.dealer)?.appearance,
+  ).deck;
   g.deck = deck();
   g.board = [];
   g.result = [];

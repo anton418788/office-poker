@@ -585,3 +585,181 @@ test("Любое меню сохраняет активный стол, прив
     await s.close();
   }
 });
+
+test("Инвентарь: у обычного игрока две базовые вещи, у администратора весь каталог всегда", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-inventory-")),
+    path = pathJoin(dir, "game.sqlite"),
+    s = await open(path);
+  try {
+    const admin = await s.setup(),
+      regular = await s.add(admin, "cosmetic_player");
+    const initial = (await s.call(regular.cookie, "state")).data.inventory;
+    assert.deepEqual(initial.owned, ["chair-classic", "deck-classic"]);
+    assert.deepEqual(initial.equipped, {
+      chair: "chair-classic",
+      deck: "deck-classic",
+    });
+    const all = (await s.call(admin, "state")).data.inventory;
+    assert.equal(all.owned.length, 8);
+    assert.equal(new Set(all.owned).size, 8);
+    for (const item of all.owned)
+      assert.equal(
+        (
+          await s.call(admin, "inventory/equip", {
+            slot: item.startsWith("chair-") ? "chair" : "deck",
+            itemId: item,
+          })
+        ).status,
+        200,
+      );
+    assert.equal(
+      (
+        await s.call(regular.cookie, "inventory/equip", {
+          slot: "chair",
+          itemId: "chair-royal",
+          admin: true,
+          id: (await s.call(admin, "state")).data.account.id,
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await s.call(regular.cookie, "inventory/equip", {
+          slot: "deck",
+          itemId: "deck-midnight",
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "inventory/equip", {
+          slot: "chair",
+          itemId: "deck-midnight",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "inventory/equip", {
+          slot: "deck",
+          itemId: "unknown",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await s.call("", "inventory/equip", {
+          slot: "chair",
+          itemId: "chair-classic",
+        })
+      ).status,
+      401,
+    );
+    // Future rewards use the same durable possession records, without granting the whole catalog.
+    const db = new DatabaseSync(path);
+    db.prepare("INSERT INTO user_items VALUES(?,?)").run(
+      regular.user.id,
+      "chair-ocean",
+    );
+    db.close();
+    const acquired = await s.call(regular.cookie, "inventory/equip", {
+      slot: "chair",
+      itemId: "chair-ocean",
+    });
+    assert.equal(acquired.status, 200);
+    assert.equal(acquired.data.inventory.equipped.chair, "chair-ocean");
+    assert.equal(acquired.data.inventory.owned.length, 3);
+    assert.equal(acquired.data.account.balance, 2000);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("Сидушка следует за аккаунтом; рубашка дилера фиксируется на всю раздачу и переживает перезапуск", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-equipped-")),
+    path = pathJoin(dir, "game.sqlite");
+  let time = 1_800_000_000_000,
+    s = await open(path, () => time);
+  try {
+    const admin = await s.setup(),
+      other = await s.add(admin, "other_cosmetic");
+    await s.call(admin, "inventory/equip", {
+      slot: "chair",
+      itemId: "chair-royal",
+    });
+    await s.call(admin, "inventory/equip", {
+      slot: "deck",
+      itemId: "deck-midnight",
+    });
+    const room = await s.create(admin),
+      id = room.room.id,
+      adminId = room.me;
+    await s.call(other.cookie, `rooms/${id}/join`, {});
+    let hand = (await s.call(admin, `rooms/${id}/start`, {})).data.room;
+    assert.equal(hand.cardBack, "deck-midnight");
+    assert.equal(
+      hand.players.find((p: any) => p.id === adminId).appearance.chair,
+      "chair-royal",
+    );
+    const changed = await s.call(admin, "inventory/equip", {
+      slot: "deck",
+      itemId: "deck-garnet",
+    });
+    assert.equal(changed.data.activeRoom.cardBack, "deck-midnight");
+    assert.equal(
+      (await s.call(other.cookie, `rooms/${id}`)).data.room.cardBack,
+      "deck-midnight",
+    );
+    await s.close();
+    s = await open(path, () => time);
+    assert.equal(
+      (await s.call(admin, `rooms/${id}`)).data.room.cardBack,
+      "deck-midnight",
+    );
+    assert.equal(
+      (await s.call(admin, "state")).data.inventory.equipped.deck,
+      "deck-garnet",
+    );
+    time = hand.deal.endsAt + 1;
+    await s.call(
+      hand.actor === adminId ? admin : other.cookie,
+      `rooms/${id}/action`,
+      { kind: "fold" },
+    );
+    hand = (await s.call(admin, `rooms/${id}/start`, {})).data.room;
+    assert.equal(hand.cardBack, "deck-classic");
+    assert.equal(
+      hand.players.find((p: any) => p.seat === hand.dealer).id,
+      other.user.id,
+    );
+    time = hand.deal.endsAt + 1;
+    await s.call(
+      hand.actor === adminId ? admin : other.cookie,
+      `rooms/${id}/action`,
+      { kind: "fold" },
+    );
+    hand = (await s.call(admin, `rooms/${id}/start`, {})).data.room;
+    assert.equal(hand.cardBack, "deck-garnet");
+    time = hand.deal.endsAt + 1;
+    await s.call(
+      hand.actor === adminId ? admin : other.cookie,
+      `rooms/${id}/action`,
+      { kind: "fold" },
+    );
+    const left = (await s.call(admin, `rooms/${id}/leave`, {})).data.room;
+    assert.ok(!left.players.some((p: any) => p.id === adminId));
+    const reseated = (await s.call(admin, `rooms/${id}/join`, { seat: 4 })).data
+      .room;
+    const player = reseated.players.find((p: any) => p.id === adminId);
+    assert.equal(player.seat, 4);
+    assert.equal(player.appearance.chair, "chair-royal");
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});

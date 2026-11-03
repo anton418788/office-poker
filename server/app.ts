@@ -1,3 +1,11 @@
+import {
+  cosmeticItems,
+  cosmeticItem,
+  defaultAppearance,
+  normalizeAppearance,
+  type Inventory,
+  type Appearance,
+} from "../shared/cosmetics.js";
 import express from "express";
 import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
@@ -81,6 +89,8 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, login TEXT UNIQUE COLLATE NOCASE, name TEXT NOT NULL, password TEXT, balance INTEGER NOT NULL CHECK(balance>=0), admin INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS account_sessions (token TEXT PRIMARY KEY, userId TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS user_items (userId TEXT NOT NULL, itemId TEXT NOT NULL, PRIMARY KEY(userId,itemId));
+    CREATE TABLE IF NOT EXISTS user_equipment (userId TEXT PRIMARY KEY, chair TEXT NOT NULL, deck TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   const transaction = (fn: () => void) => {
     db.exec("BEGIN IMMEDIATE");
@@ -150,6 +160,37 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
   const presence = new Map<string, Map<string, number>>();
   const user = (id: string) =>
     db.prepare("SELECT * FROM users WHERE id=?").get(id) as UserRow | undefined;
+  const inventoryFor = (u: UserRow): Inventory => {
+    const extras = (
+      db.prepare("SELECT itemId FROM user_items WHERE userId=?").all(u.id) as {
+        itemId: string;
+      }[]
+    ).map((row) => row.itemId);
+    const owned = u.admin
+      ? cosmeticItems.map((item) => item.id)
+      : [
+          ...new Set([
+            ...Object.values(defaultAppearance),
+            ...extras.filter((id) => cosmeticItem(id)),
+          ]),
+        ];
+    const saved = db
+      .prepare("SELECT chair,deck FROM user_equipment WHERE userId=?")
+      .get(u.id) as Appearance | undefined;
+    const equipped = normalizeAppearance(saved);
+    if (!owned.includes(equipped.chair))
+      equipped.chair = defaultAppearance.chair;
+    if (!owned.includes(equipped.deck)) equipped.deck = defaultAppearance.deck;
+    return { owned, equipped };
+  };
+  // Older rooms acquire the same account appearance without changing the hand's deck.
+  for (const room of rooms.values())
+    for (const p of room.game.players) {
+      const account = !p.bot ? user(p.id) : undefined;
+      p.appearance = account
+        ? inventoryFor(account).equipped
+        : { ...defaultAppearance };
+    }
   const initialized = () =>
     !!db
       .prepare("SELECT id FROM users WHERE admin=1 AND password IS NOT NULL")
@@ -267,6 +308,7 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
       needsSetup: !initialized(),
       canSetup: !initialized() && res.locals.local,
       rooms: u ? summaries(u.id) : [],
+      ...(u ? { inventory: inventoryFor(u) } : {}),
       ...(room && u ? { room: roomView(room, u) } : {}),
       ...(active && u
         ? {
@@ -382,6 +424,36 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     res.locals.account = undefined;
     res.json(state(res));
   });
+  app.post("/api/inventory/equip", requireUser, (req, res) => {
+    const u: UserRow = res.locals.account;
+    const { slot, itemId } = req.body ?? {};
+    if (slot !== "chair" && slot !== "deck")
+      fail("Неизвестная категория предмета");
+    const item = cosmeticItem(itemId, slot);
+    if (!item) fail("Предмет не найден");
+    const inventory = inventoryFor(u);
+    if (!inventory.owned.includes(item.id))
+      fail("Этого предмета пока нет в вашем инвентаре", 403);
+    const equipped = { ...inventory.equipped, [slot]: item.id };
+    const active = occupied(u.id);
+    const next = active ? structuredClone(active) : null;
+    if (next)
+      next.game.players.find((p) => p.id === u.id)!.appearance = equipped;
+    transaction(() => {
+      db.prepare("INSERT OR REPLACE INTO user_equipment VALUES(?,?,?)").run(
+        u.id,
+        equipped.chair,
+        equipped.deck,
+      );
+      if (next)
+        db.prepare("UPDATE rooms SET json=? WHERE id=?").run(
+          JSON.stringify(next),
+          next.id,
+        );
+    });
+    if (next) rooms.set(next.id, next);
+    res.json(state(res));
+  });
   app.get("/api/accounts", requireUser, requireAdmin, (_req, res) =>
     res.json(
       (db.prepare("SELECT * FROM users ORDER BY name").all() as UserRow[]).map(
@@ -458,6 +530,7 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     game.settings = settings;
     join(game, u.id, u.name);
     game.players[0].chips = u.balance;
+    game.players[0].appearance = inventoryFor(u).equipped;
     const room: Room = {
       id: randomUUID(),
       name,
@@ -500,6 +573,8 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
         if (current) fail("Вы уже сидите за столом. Сначала покиньте его.");
         join(g, u.id, u.name, b.seat);
         g.players.find((p) => p.id === u.id)!.chips = u.balance;
+        g.players.find((p) => p.id === u.id)!.appearance =
+          inventoryFor(u).equipped;
         break;
       }
       case "action":

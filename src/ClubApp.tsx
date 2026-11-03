@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClubState } from "../shared/types";
 import { GameScreen } from "./App";
+import { InventoryPanel } from "./InventoryPanel";
 import { AccountsPanel } from "./AccountsPanel";
 import { useGameSounds } from "./useGameSounds";
 import { useDealPresentation } from "./useDealPresentation";
 import { ReturnToTable } from "./ReturnToTable";
 import { useTheme } from "./useTheme";
 import "./club.css";
+import "./cosmetics.css";
 const format = (n: number) => n.toLocaleString("ru-RU");
 const phaseNames = {
   waiting: "Ожидает игроков",
@@ -250,7 +252,7 @@ export default function ClubApp() {
     );
   const active = snapshot.activeRoom;
   const showReturn =
-    !!active && (selected !== active.room?.id || page === "accounts");
+    !!active && (selected !== active.room?.id || page !== "lobby");
   const returnButton = showReturn ? (
     <ReturnToTable
       game={active!}
@@ -264,7 +266,7 @@ export default function ClubApp() {
     selected &&
     snapshot.room &&
     snapshot.room.room?.id === selected &&
-    page !== "accounts"
+    page === "lobby"
   )
     return (
       <div className={showReturn ? "with-table-return" : undefined}>
@@ -283,6 +285,10 @@ export default function ClubApp() {
           onLobby={() => {
             choose(null);
             setPage("lobby");
+          }}
+          onInventory={() => {
+            choose(null);
+            setPage("inventory");
           }}
           onAccounts={() => {
             choose(null);
@@ -325,6 +331,14 @@ export default function ClubApp() {
           </button>
           <span>{account.name}</span>
           <strong>◉ {format(account.balance)}</strong>
+          <button
+            onClick={() => {
+              choose(null);
+              setPage(page === "inventory" ? "lobby" : "inventory");
+            }}
+          >
+            {page === "inventory" ? "Все столы" : "Инвентарь"}
+          </button>
           {account.admin && (
             <button
               onClick={() => {
@@ -341,7 +355,18 @@ export default function ClubApp() {
         </div>
       </header>
       <main className="club-main">
-        {page === "accounts" && account.admin ? (
+        {page === "inventory" && snapshot.inventory ? (
+          <InventoryPanel
+            inventory={snapshot.inventory}
+            admin={account.admin}
+            busy={busy}
+            error={error}
+            onBack={() => setPage("lobby")}
+            onEquip={async (slot, itemId) =>
+              !!(await perform("inventory/equip", { slot, itemId }))
+            }
+          />
+        ) : page === "accounts" && account.admin ? (
           <AccountsPanel
             request={request}
             onBack={() => setPage("lobby")}

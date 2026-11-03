@@ -1,0 +1,256 @@
+/* The classic chair/back keep the existing artwork in both themes. */
+.chair[data-chair="chair-burgundy"] {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 14px,
+      #e5acac20 14px 15px,
+      transparent 15px 29px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 14px,
+      #e5acac20 14px 15px,
+      transparent 15px 29px
+    ),
+    linear-gradient(#98565d, #69333d);
+  border-color: #542833;
+  box-shadow:
+    0 6px 0 #42212b,
+    0 11px 15px #0003;
+}
+.chair[data-chair="chair-burgundy"]:before {
+  background: linear-gradient(#a5686b, #793c47);
+  border-color: #592b37;
+}
+.chair[data-chair="chair-ocean"] {
+  background:
+    repeating-radial-gradient(
+      ellipse at 15% 0%,
+      transparent 0 10px,
+      #a1c5de25 11px 12px,
+      transparent 13px 23px
+    ),
+    linear-gradient(#4f7896, #254c6b);
+  border-color: #203d56;
+  box-shadow:
+    0 6px 0 #1a3248,
+    0 11px 15px #0003;
+}
+.chair[data-chair="chair-ocean"]:before {
+  background: linear-gradient(#638da5, #365c7b);
+  border-color: #29495f;
+}
+.chair[data-chair="chair-royal"] {
+  background:
+    radial-gradient(
+      ellipse at 30% 40%,
+      transparent 0 13px,
+      #d6b96a66 14px 15px,
+      transparent 16px
+    ),
+    radial-gradient(
+      ellipse at 70% 40%,
+      transparent 0 13px,
+      #d6b96a66 14px 15px,
+      transparent 16px
+    ),
+    linear-gradient(#796382, #4b3c58);
+  border-color: #8e7950;
+  box-shadow:
+    0 6px 0 #3b3046,
+    0 11px 15px #0003;
+}
+.chair[data-chair="chair-royal"]:before {
+  background: linear-gradient(#8e7793, #5c4b65);
+  border-color: #a48c5e;
+}
+.card.back[data-card-back="deck-midnight"] {
+  background:
+    radial-gradient(circle, #d8c384 1px, transparent 1.5px) 0 0/12px 12px,
+    linear-gradient(135deg, #263e62, #142640);
+  border-color: #c6c4a7;
+  color: #ebd496;
+}
+.card.back[data-card-back="deck-garnet"] {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 7px,
+      #e8bd8240 7px 8px,
+      transparent 8px 15px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 7px,
+      #e8bd8240 7px 8px,
+      transparent 8px 15px
+    ),
+    linear-gradient(#9a3b4a, #622c3d);
+  border-color: #e5ce9a;
+  color: #f5dfad;
+}
+.card.back[data-card-back="deck-ivory"] {
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 0 27%,
+      #b18c4a 28% 30%,
+      transparent 31% 37%,
+      #b18c4a88 38% 39%,
+      transparent 40%
+    ),
+    repeating-linear-gradient(45deg, #e7d8b9 0 2px, #f6eed9 2px 6px);
+  border-color: #baa16b;
+  color: #967335;
+}
+.inventory-tabs {
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.inventory-tabs [aria-selected="true"] {
+  background: var(--lime);
+  color: #264832;
+  border-color: #91ae73;
+}
+.inventory-note {
+  font-size: 14px;
+  margin: 20px 0 26px;
+  max-width: 850px;
+}
+.inventory-note > span {
+  color: var(--ink);
+}
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.inventory-item {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fffef8;
+  display: flex;
+  flex-direction: column;
+}
+.inventory-item.item-equipped {
+  border-color: #83a36e;
+  box-shadow: 0 0 0 1px #83a36e;
+}
+.inventory-preview {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 175px;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 80%, #bdd0ae66, transparent 70%), #eff2e9;
+  overflow: hidden;
+}
+.inventory-preview > .chair {
+  position: relative;
+  top: 0;
+  z-index: 0;
+  opacity: 1;
+  transform: scale(1.25);
+}
+.preview-deck {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-8deg);
+}
+.preview-deck .card {
+  width: 66px;
+  height: 96px;
+  border-radius: 7px;
+  box-shadow: 0 5px 10px #17281c30;
+}
+.preview-deck .card + .card {
+  margin-left: -36px;
+  transform: translateY(-3px) rotate(15deg);
+}
+.preview-deck .card > span {
+  font-size: 26px;
+}
+.inventory-item h2 {
+  font-size: 18px;
+  font-family: Manrope, system-ui, sans-serif;
+  margin: 20px 0 8px;
+}
+.inventory-item p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+  flex: 1;
+}
+.inventory-item > button {
+  font-size: 13px;
+}
+.inventory-item.item-locked .inventory-preview > .chair,
+.inventory-item.item-locked .preview-deck {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+.inventory-item.item-locked h2 {
+  color: var(--muted);
+}
+.inventory-lock {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  font-size: 20px;
+}
+.inventory-selected {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  border-radius: 20px;
+  padding: 4px 8px;
+  background: #edf4dd;
+  color: #405f30;
+  font-size: 10px;
+  font-weight: 600;
+}
+[data-theme="club"] .inventory-item {
+  background: #142c20;
+  border-color: #33523d;
+}
+[data-theme="club"] .inventory-item.item-equipped {
+  border-color: #8fb979;
+}
+[data-theme="club"] .inventory-preview {
+  background:
+    radial-gradient(ellipse at 50% 90%, #496c4266, transparent 70%), #102218;
+}
+@media (max-width: 1050px) {
+  .inventory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .inventory-grid {
+    gap: 12px;
+  }
+  .inventory-item {
+    padding: 12px;
+  }
+  .inventory-preview {
+    height: 145px;
+  }
+  .inventory-item h2 {
+    font-size: 15px;
+  }
+  .inventory-item p {
+    font-size: 12px;
+  }
+  .inventory-tabs button {
+    padding: 10px;
+    font-size: 13px;
+  }
+}

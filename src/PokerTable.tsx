@@ -1,3 +1,4 @@
+import { normalizeAppearance, defaultAppearance } from "../shared/cosmetics";
 import {
   useEffect,
   useLayoutEffect,
@@ -47,6 +48,7 @@ export function PokerTable({
     pausedAt = useRef<number | null>(null);
   const inHand =
     !["waiting", "showdown"].includes(g.phase) || presentation.active;
+  const cardBack = g.cardBack ?? defaultAppearance.deck;
   const canSit = !g.players.some((p) => p.id === g.me);
   const sceneRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(() => window.innerWidth <= 680);
@@ -200,6 +202,7 @@ export function PokerTable({
                   className={`board-slot ${winningBoard.has(i) ? "winning-board-card" : ""} ${g.deal && i >= g.deal.boardFrom && i < presentation.boardFaces ? "board-revealed" : ""}`}
                 >
                   <Card
+                    skin={cardBack}
                     card={i < presentation.boardFaces ? g.board[i] : undefined}
                     back={
                       i >= presentation.boardFaces &&
@@ -259,7 +262,11 @@ export function PokerTable({
                 { "--seat-x": `${x}%`, "--seat-y": `${y}%` } as CSSProperties
               }
             >
-              <div className="chair" aria-hidden="true">
+              <div
+                className="chair"
+                data-chair={normalizeAppearance(p?.appearance).chair}
+                aria-hidden="true"
+              >
                 <i />
               </div>
               {p ? (
@@ -272,8 +279,8 @@ export function PokerTable({
                         className="discarded-cards"
                         aria-label={`Сброшенные карты: ${p.name}`}
                       >
-                        <Card back small />
-                        <Card back small />
+                        <Card back small skin={cardBack} />
+                        <Card back small skin={cardBack} />
                       </div>
                     ) : p.cards.length ? (
                       p.cards
@@ -289,7 +296,7 @@ export function PokerTable({
                     ) : inHand && !p.folded ? (
                       Array.from(
                         { length: presentation.holeCount(seat) },
-                        (_, i) => <Card key={i} back small />,
+                        (_, i) => <Card key={i} back small skin={cardBack} />,
                       )
                     ) : null}
                   </div>
@@ -392,7 +399,7 @@ export function PokerTable({
                   transform: `translate(${i * 1.5}px,${-i * 2}px) rotate(-12deg)`,
                 }}
               >
-                <Card back small />
+                <Card back small skin={cardBack} />
               </div>
             ))}
             <span>Колода · D</span>
@@ -426,6 +433,7 @@ export function PokerTable({
               <CardFlight
                 key={move.key}
                 move={move}
+                cardBack={cardBack}
                 from={origin}
                 to={target}
                 width={sceneSize.width}

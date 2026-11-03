@@ -8,6 +8,7 @@ export function CardFlight({
   width,
   height,
   pausedAt,
+  cardBack,
 }: {
   move: CardMove;
   from: number[];
@@ -15,6 +16,7 @@ export function CardFlight({
   width: number;
   height: number;
   pausedAt?: number;
+  cardBack?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -68,7 +70,7 @@ export function CardFlight({
         move.kind === "hole" ? `seat-${move.seat}` : `board-${move.index}`
       }
     >
-      <Card back small />
+      <Card back small skin={cardBack} />
     </div>
   );
 }

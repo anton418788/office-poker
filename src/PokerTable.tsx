@@ -244,7 +244,7 @@ export function PokerTable({
         {g.players.map((p) => {
           const item = cosmeticItem(p.appearance?.accessory, "accessory");
           if (!item) return null;
-          const [x, y] = accessoryPoint(p.seat, viewerSeat);
+          const [x, y] = accessoryPoint(p.seat, viewerSeat, compact);
           return (
             <div
               key={p.id}

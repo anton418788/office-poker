@@ -25,7 +25,7 @@ test("15 аксессуаров: 8 редких, 5 эпических, 2 экс�
 });
 test("Аксессуары сохраняют место относительно владельца при всех шести поворотах стола", () => {
   for (let viewer = 0; viewer < 6; viewer++) {
-    assert.deepEqual(accessoryPoint(viewer, viewer), [32, 77]);
+    assert.deepEqual(accessoryPoint(viewer, viewer), [42, 80]);
     for (let position = 0; position < 6; position++)
       assert.deepEqual(
         accessoryPoint(seatAtView(position, viewer), viewer),

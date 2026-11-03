@@ -26,6 +26,7 @@ export function GameScreen({
   onShop,
   onProfile,
   giftCount,
+  onPlayerProfile,
   onLogout,
   design,
   sound,
@@ -41,6 +42,7 @@ export function GameScreen({
   onShop: () => void;
   onProfile: () => void;
   giftCount: number;
+  onPlayerProfile: (id: string) => void;
   onLogout: () => void;
   design: ReturnType<typeof useTheme>;
   sound: ReturnType<typeof useGameSounds>;
@@ -280,6 +282,7 @@ export function GameScreen({
           <div className="game-layout">
             <section className="game-area">
               <PokerTable
+                onPlayerProfile={onPlayerProfile}
                 game={g}
                 busy={busy || presentation.active}
                 participantBusy={busy}

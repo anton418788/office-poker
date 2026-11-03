@@ -75,6 +75,37 @@ test("Профиль через API: завершение раздачи, сох
     assert.equal(ended.data.profile.wins, 1);
     assert.equal(ended.data.profile.combinations.straight, 1);
     const gift = ended.data.profile.gifts[0];
+    const publicResult = await s.call(admin, `profiles/${regular.user.id}`);
+    assert.equal(publicResult.status, 200);
+    assert.equal(publicResult.data.player.name, "profile_user");
+    assert.equal(publicResult.data.hands, 1);
+    assert.equal(publicResult.data.combinations.straight, 1);
+    assert.equal(publicResult.data.collection.common, 2);
+    assert.deepEqual(
+      Object.keys(publicResult.data).sort(),
+      [
+        "player",
+        "hands",
+        "wins",
+        "showdowns",
+        "combinations",
+        "collection",
+      ].sort(),
+    );
+    assert.deepEqual(
+      Object.keys(publicResult.data.player).sort(),
+      ["id", "name", "balance", "admin"].sort(),
+    );
+    assert.equal(JSON.stringify(publicResult.data).includes(gift.id), false);
+    assert.equal((await s.call("", `profiles/${regular.user.id}`)).status, 401);
+    assert.equal(
+      (await s.call(regular.cookie, "profiles/missing-player")).status,
+      404,
+    );
+    const adminId = (await s.call(admin, "state")).data.account.id;
+    const adminPublic = await s.call(regular.cookie, `profiles/${adminId}`);
+    assert.equal(adminPublic.status, 200);
+    assert.equal(adminPublic.data.collection.exclusive, 4);
     assert.equal(gift.rarity, "rare");
     assert.equal(ended.data.account.balance, 2020);
     for (let i = 0; i < 3; i++)
@@ -131,6 +162,10 @@ test("Профиль через API: завершение раздачи, сох
     assert.equal(persisted.profile.combinations.straight, 1);
     assert.equal(persisted.profile.gifts.length, 0);
     assert.equal(persisted.inventory.owned.length, 3);
+    assert.equal(
+      (await s.call(admin, `profiles/${regular.user.id}`)).data.collection.rare,
+      1,
+    );
     // Full rare accessory collection: the reward must also reach the room stack,
     // remain on the account after restart, and never be minted twice.
     await s.close();

@@ -43,12 +43,14 @@ export function PokerTable({
   participantBusy = busy,
   send,
   presentation,
+  onPlayerProfile,
 }: {
   presentation: ReturnType<typeof useDealPresentation>;
   game: View;
   busy: boolean;
   participantBusy?: boolean;
   send: (command: string, body?: object) => Promise<void>;
+  onPlayerProfile: (id: string) => void;
 }) {
   const previous = useRef<number | null>(null),
     [flights, setFlights] = useState<Flight[]>([]),
@@ -263,6 +265,7 @@ export function PokerTable({
           const seat = seatAtView(position, viewerSeat);
           const [x, y] = point(seat);
           const p = g.players.find((p) => p.seat === seat);
+          const ProfileTrigger = p?.bot ? "span" : "button";
           const winningHole =
             (p ? highlights.get(p.id)?.holeIndexes : []) ?? [];
           const visibleChips = p
@@ -339,18 +342,27 @@ export function PokerTable({
                         await send("kick", { id: p.id });
                       }}
                     />
-                    <span className={`avatar color-${seat}`}>
-                      {p.bot ? "🤖" : p.name.slice(0, 1).toUpperCase()}
-                      {crowns.includes(p.id) && <WinnerCrown />}
-                    </span>
-                    <div>
-                      <b title={p.name}>
-                        {p.name}
-                        {p.id === g.me ? " · вы" : p.bot ? " · бот" : ""}
-                      </b>
-                      <span>{format(visibleChips)}</span>
-                    </div>
-                    {g.dealer === seat && <i className="dealer">D</i>}
+                    <ProfileTrigger
+                      className="player-profile-hit"
+                      id={`player-profile-${p.id}`}
+                      type={p.bot ? undefined : "button"}
+                      aria-label={p.bot ? undefined : `Мини-профиль: ${p.name}`}
+                      aria-haspopup={p.bot ? undefined : "dialog"}
+                      onClick={p.bot ? undefined : () => onPlayerProfile(p.id)}
+                    >
+                      <span className={`avatar color-${seat}`}>
+                        {p.bot ? "🤖" : p.name.slice(0, 1).toUpperCase()}
+                        {crowns.includes(p.id) && <WinnerCrown />}
+                      </span>
+                      <div>
+                        <b title={p.name}>
+                          {p.name}
+                          {p.id === g.me ? " · вы" : p.bot ? " · бот" : ""}
+                        </b>
+                        <span>{format(visibleChips)}</span>
+                      </div>
+                      {g.dealer === seat && <i className="dealer">D</i>}
+                    </ProfileTrigger>
                   </div>
                   {p.lastAction?.hand === g.hand && (
                     <span

@@ -31,8 +31,28 @@
 .club-profile {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
+}
+@media (min-width: 901px) {
+  .club-profile > button:not(.profile-access) {
+    padding-inline: 12px;
+  }
+}
+.club-profile button[aria-current="page"] {
+  background: #e5e8df;
+  color: #6b766b;
+  border-color: #c4cbbd;
+  box-shadow: inset 0 2px 4px #21332818;
+  opacity: 0.8;
+  cursor: default;
+  transform: none;
+}
+[data-theme="club"] .club-profile button[aria-current="page"] {
+  background: #25392c;
+  color: #a2ad9f;
+  border-color: #3c5040;
+  box-shadow: inset 0 2px 4px #0003;
 }
 .club-profile strong,
 .account-balance {

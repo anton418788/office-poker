@@ -491,6 +491,25 @@ export function createApp(
     if (next) rooms.set(next.id, next);
     res.json(state(res));
   });
+  app.get("/api/profiles/:id", requireUser, (req, res) => {
+    const target = user(String(req.params.id));
+    if (!target) fail("Профиль игрока не найден", 404);
+    const { hands, wins, showdowns, combinations, collection } =
+      profiles.profile(target.id);
+    res.json({
+      player: {
+        id: target.id,
+        name: target.name,
+        balance: target.balance,
+        admin: !!target.admin,
+      },
+      hands,
+      wins,
+      showdowns,
+      combinations,
+      collection,
+    });
+  });
   app.post("/api/profile/gifts/:id/open", requireUser, (req, res) => {
     const u: UserRow = res.locals.account;
     const giftId = String(req.params.id);

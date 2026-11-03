@@ -4,11 +4,13 @@ export function ProfileButton({
   count,
   onClick,
   winner = false,
+  active = false,
 }: {
   name?: string;
   count: number;
   onClick: () => void;
   winner?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -16,6 +18,8 @@ export function ProfileButton({
       onClick={onClick}
       aria-label={count ? `Профиль, неоткрытых подарков: ${count}` : "Профиль"}
       title="Мой профиль"
+      aria-current={active ? "page" : undefined}
+      disabled={active}
     >
       <span className="profile-access-avatar" aria-hidden="true">
         {name?.slice(0, 1).toUpperCase() || "♙"}

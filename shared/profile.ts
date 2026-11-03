@@ -54,3 +54,9 @@ export type PlayerProfile = {
   recentRewards: ProfileGift[];
   giftSequence: number;
 };
+export type PublicPlayerProfile = Pick<
+  PlayerProfile,
+  "hands" | "wins" | "showdowns" | "combinations" | "collection"
+> & {
+  player: { id: string; name: string; balance: number; admin: boolean };
+};

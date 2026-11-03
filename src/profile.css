@@ -540,3 +540,115 @@
     animation: none;
   }
 }
+.player > .player-profile-hit {
+  display: flex;
+  align-items: center;
+  gap: inherit;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  text-align: left;
+  font: inherit;
+  position: static;
+}
+.player-profile-hit > div {
+  min-width: 0;
+}
+.player > button.player-profile-hit:hover {
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  transform: none;
+}
+.player > button.player-profile-hit:focus-visible {
+  outline: 2px solid #d4bd76;
+  outline-offset: 5px;
+}
+.mini-profile {
+  position: fixed;
+  right: 24px;
+  top: 96px;
+  z-index: 90;
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 115px);
+  overflow: auto;
+  padding: 24px;
+  box-shadow: 0 12px 40px #0004;
+}
+.mini-profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 12px;
+}
+.mini-profile-heading .profile-portrait {
+  width: 46px;
+  height: 46px;
+  font-size: 24px;
+  border-radius: 14px;
+}
+.mini-profile-heading h2 {
+  font-size: 17px;
+  line-height: 1.35;
+  margin: 0 0 5px;
+  overflow-wrap: anywhere;
+}
+.mini-profile-heading small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.mini-profile-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 23px;
+  padding: 2px 9px;
+  border: 0;
+  background: none;
+}
+.mini-profile-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 24px 0 18px;
+}
+.mini-profile-metrics > div {
+  display: grid;
+  gap: 6px;
+}
+.mini-profile-metrics strong {
+  font-size: 21px;
+}
+.mini-profile-metrics span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.mini-profile-best {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  font-size: 11px;
+  margin: 0 0 20px;
+}
+.mini-profile-best strong {
+  display: block;
+  font-size: 15px;
+  margin-top: 7px;
+  color: var(--ink);
+}
+.mini-profile > .primary {
+  width: 100%;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .mini-profile {
+    top: 82px;
+    right: 12px;
+  }
+}

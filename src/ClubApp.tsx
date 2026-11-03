@@ -9,6 +9,7 @@ import { useDealPresentation } from "./useDealPresentation";
 import { ReturnToTable } from "./ReturnToTable";
 import { ProfileButton } from "./ProfileButton";
 import { ProfilePanel } from "./ProfilePanel";
+import { MiniProfile, PublicProfilePage } from "./PublicProfile";
 import { useTheme } from "./useTheme";
 import "./club.css";
 import "./cosmetics.css";
@@ -40,9 +41,15 @@ export default function ClubApp() {
   const version = useRef(0),
     pending = useRef(false);
   const [giftNotice, setGiftNotice] = useState(false);
+  const [previewPlayer, setPreviewPlayer] = useState<string | null>(null),
+    [viewedPlayer, setViewedPlayer] = useState<string | null>(null);
   const giftSeen = useRef<{ user: string; sequence: number } | null>(null);
   const profile = snapshot?.profile;
   const userId = snapshot?.account?.id;
+  useEffect(() => {
+    setPreviewPlayer(null);
+    setViewedPlayer(null);
+  }, [userId]);
   useEffect(() => {
     if (!userId || !profile) {
       giftSeen.current = null;
@@ -285,6 +292,24 @@ export default function ClubApp() {
     setGiftNotice(false);
   };
   const giftCount = profile?.gifts.length ?? 0;
+  const miniProfile = previewPlayer ? (
+    <MiniProfile
+      key={previewPlayer}
+      id={previewPlayer}
+      request={request}
+      onClose={() => setPreviewPlayer(null)}
+      onVisit={() => {
+        const target = previewPlayer;
+        setPreviewPlayer(null);
+        if (target === account.id) openProfile();
+        else {
+          setViewedPlayer(target);
+          choose(null);
+          setPage("playerProfile");
+        }
+      }}
+    />
+  ) : null;
   const giftToast =
     giftNotice && giftCount > 0 && page !== "profile" ? (
       <aside className="gift-toast" role="status">
@@ -319,6 +344,7 @@ export default function ClubApp() {
       <div className={showReturn ? "with-table-return" : undefined}>
         {returnButton}
         {giftToast}
+        {miniProfile}
         <GameScreen
           key={selected}
           design={theme}
@@ -327,6 +353,7 @@ export default function ClubApp() {
           account={account}
           onProfile={openProfile}
           giftCount={giftCount}
+          onPlayerProfile={setPreviewPlayer}
           send={async (cmd, body) => {
             await perform(`rooms/${selected}/${cmd}`, body);
           }}
@@ -357,6 +384,7 @@ export default function ClubApp() {
     <div className={`club-shell ${showReturn ? "with-table-return" : ""}`}>
       {returnButton}
       {giftToast}
+      {miniProfile}
       <header className="club-header">
         <button
           className="club-wordmark"
@@ -388,32 +416,49 @@ export default function ClubApp() {
             name={account.name}
             count={giftCount}
             onClick={openProfile}
+            active={page === "profile"}
           />
           <strong>◉ {format(account.balance)}</strong>
           <button
+            aria-current={page === "lobby" ? "page" : undefined}
+            disabled={page === "lobby"}
             onClick={() => {
               choose(null);
-              setPage(page === "inventory" ? "lobby" : "inventory");
+              setPage("lobby");
             }}
           >
-            {page === "inventory" ? "Все столы" : "Инвентарь"}
+            Все столы
           </button>
           <button
+            aria-current={page === "inventory" ? "page" : undefined}
+            disabled={page === "inventory"}
             onClick={() => {
               choose(null);
-              setPage(page === "shop" ? "lobby" : "shop");
+              setPage("inventory");
             }}
           >
-            {page === "shop" ? "Все столы" : "Магазин"}
+            Инвентарь
+          </button>
+          <button
+            aria-current={page === "shop" ? "page" : undefined}
+            disabled={page === "shop"}
+            onClick={() => {
+              choose(null);
+              setPage("shop");
+            }}
+          >
+            Магазин
           </button>
           {account.admin && (
             <button
+              aria-current={page === "accounts" ? "page" : undefined}
+              disabled={page === "accounts"}
               onClick={() => {
                 choose(null);
-                setPage(page === "accounts" ? "lobby" : "accounts");
+                setPage("accounts");
               }}
             >
-              {page === "accounts" ? "Все столы" : "Аккаунты игроков"}
+              Аккаунты игроков
             </button>
           )}
           <button onClick={() => void perform("logout")} disabled={busy}>
@@ -422,7 +467,17 @@ export default function ClubApp() {
         </div>
       </header>
       <main className="club-main">
-        {page === "profile" && profile ? (
+        {page === "playerProfile" && viewedPlayer ? (
+          <PublicProfilePage
+            key={viewedPlayer}
+            id={viewedPlayer}
+            request={request}
+            onBack={() => {
+              if (active?.room?.id) choose(active.room.id);
+              setPage("lobby");
+            }}
+          />
+        ) : page === "profile" && profile ? (
           <ProfilePanel
             key={account.id}
             account={account}

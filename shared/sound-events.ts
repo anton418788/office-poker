@@ -1,10 +1,12 @@
 import type { View } from "./types";
 export type GameSound =
-  "cards" | "chips" | "payout" | "turn" | "deal" | "flip" | "shuffle";
+  "cards" | "chips" | "payout" | "turn" | "deal" | "flip" | "shuffle" | "check";
 // Compare authoritative snapshots so polling the same state never repeats a sound.
 export function soundEvents(previous: View | null, next: View): GameSound[] {
   if (!previous) return [];
-  const events: GameSound[] = [];
+  const events: GameSound[] = (next.checks ?? [])
+    .filter((e) => e.id > (previous.checkSeq ?? 0))
+    .map(() => "check");
   if (next.hand !== previous.hand || next.board.length > previous.board.length)
     events.push("cards");
   const fresh = (next.transfers ?? []).filter(

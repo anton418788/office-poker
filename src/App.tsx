@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import type { View } from "../shared/types";
 import "./style.css";
+import "./themes.css";
 import { useGameSounds } from "./useGameSounds";
 import { Card } from "./Card";
 import { PokerTable } from "./PokerTable";
 import { TableSidebar } from "./TableSidebar";
 import { useDealPresentation } from "./useDealPresentation";
+import { useTheme } from "./useTheme";
 const format = (n: number) => n.toLocaleString("ru-RU");
 export default function App() {
   const [g, setG] = useState<View | null>(null),
@@ -30,6 +32,7 @@ export default function App() {
       return false;
     }
   });
+  const design = useTheme();
   const sound = useGameSounds(g);
   const presentation = useDealPresentation(g, sound.play);
   function toggleMenu() {
@@ -203,6 +206,26 @@ export default function App() {
             </div>
           </div>
           <div className="profile">
+            <button
+              className="theme-toggle"
+              onClick={design.toggle}
+              aria-label={
+                design.theme === "club"
+                  ? "Включить светлую тему"
+                  : "Включить клубную тему"
+              }
+              aria-pressed={design.theme === "club"}
+              title={
+                design.theme === "club"
+                  ? "Переключить на светлую тему"
+                  : "Переключить на клубную тему"
+              }
+            >
+              {design.theme === "club" ? "☀" : "♣"}
+              <span>
+                {design.theme === "club" ? "Светлая тема" : "Клубная тема"}
+              </span>
+            </button>
             <button
               className="sound-toggle"
               onClick={sound.toggle}

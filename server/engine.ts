@@ -272,6 +272,11 @@ export function action(
     log(g, `${p.name}: пас`);
   } else if (kind === "check") {
     if (call) throw Error("Нужно уравнять ставку или сбросить");
+    g.checkSeq = (g.checkSeq ?? 0) + 1;
+    g.checks = [
+      ...(g.checks ?? []),
+      { id: g.checkSeq, hand: g.hand, seat: p.seat },
+    ].slice(-32);
     log(g, `${p.name}: чек`);
   } else if (kind === "call") {
     if (!call) throw Error("Ставки нет — можно сделать чек");

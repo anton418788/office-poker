@@ -1,5 +1,6 @@
 import type { GameSound } from "../shared/sound-events";
 const files = {
+  check: ["check-double-tap"],
   deal: ["card-slide-1"],
   flip: ["card-place-1"],
   shuffle: ["card-shuffle"],
@@ -84,7 +85,8 @@ export function createAudioPlayer() {
       const source = ctx.createBufferSource(),
         gain = ctx.createGain();
       source.buffer = buffer;
-      source.playbackRate.value = 0.95 + Math.random() * 0.1;
+      source.playbackRate.value =
+        sound === "check" ? 1 : 0.95 + Math.random() * 0.1;
       gain.gain.value = ["cards", "deal", "flip", "shuffle"].includes(sound)
         ? 0.62
         : 0.9;

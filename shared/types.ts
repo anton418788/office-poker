@@ -30,7 +30,10 @@ export type DealPresentation = {
   endsAt: number;
   pausedAt?: number;
 };
+export type CheckEvent = { id: number; hand: number; seat: number };
 export type Game = {
+  checkSeq?: number;
+  checks?: CheckEvent[];
   deal?: DealPresentation;
   dealAnimations?: boolean;
   transferSeq?: number;

@@ -1,0 +1,456 @@
+/* The original light theme remains the default. Cards and chip denominations keep their artwork. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  font-size: 16px;
+  background: #e9efdf;
+  border-color: #d5dfc7;
+  color: #536e42;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.theme-toggle span {
+  font-size: 11px;
+}
+@media (min-width: 1100px) {
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr) 336px;
+  }
+  .table-tools.tools-open {
+    width: 336px;
+  }
+}
+.table-tools {
+  max-width: min(344px, calc(100vw - 24px));
+}
+@media (max-width: 1099px) {
+  .table-tools.tools-open {
+    width: 336px;
+  }
+}
+.side-odds .odds-heading h2 {
+  font-size: 19px;
+}
+.side-odds .odds-name > b {
+  font-size: 13px;
+}
+.side-odds .odds-chance {
+  width: 70px;
+}
+.side-odds .odds-chance strong {
+  font-size: 14px;
+}
+@media (max-width: 560px) {
+  .theme-toggle {
+    padding: 7px 9px;
+  }
+  .theme-toggle span {
+    display: none;
+  }
+}
+
+:root[data-theme="club"] {
+  color-scheme: dark;
+  color: #e0eee4;
+  background: #08170f;
+  --ink: #dbece0;
+  --muted: #96b29f;
+  --lime: #62dca4;
+  --line: #2a4b38;
+}
+[data-theme="club"] .app {
+  background:
+    radial-gradient(ellipse at 40% 0, #183a29 0, transparent 55%), #0a1912;
+}
+[data-theme="club"] header {
+  border-color: #284333;
+}
+[data-theme="club"] .breadcrumbs,
+[data-theme="club"] .eyebrow {
+  color: #95af91;
+}
+[data-theme="club"] .breadcrumbs span {
+  color: #55755e;
+}
+[data-theme="club"] h1 {
+  color: #edf3e5;
+  text-shadow: 0 2px 18px #5ce39b12;
+}
+[data-theme="club"] button {
+  background: #193729;
+  border-color: #345640;
+  color: #d4e8d7;
+}
+[data-theme="club"] button:hover:not(:disabled) {
+  background: #254b36;
+}
+[data-theme="club"] button:focus-visible,
+[data-theme="club"] a:focus-visible {
+  outline-color: #d7c17d;
+}
+[data-theme="club"] .primary {
+  background: linear-gradient(#6be0a5, #3abb83);
+  border-color: #70dca4;
+  color: #072d1a;
+  box-shadow: 0 4px 15px #20a86e1c;
+}
+[data-theme="club"] .primary:hover:not(:disabled) {
+  background: linear-gradient(#83e9b7, #52cf92);
+  box-shadow: 0 4px 22px #20a86e30;
+}
+[data-theme="club"] input,
+[data-theme="club"] select {
+  background: #0d2519;
+  color: #e2efdf;
+  border-color: #3a5b43;
+}
+[data-theme="club"] input:focus,
+[data-theme="club"] select:focus {
+  outline-color: #9dba72;
+}
+[data-theme="club"] .sidebar {
+  background: linear-gradient(180deg, #0a1e13, #07110c);
+  border-right: 1px solid #2f4831;
+}
+[data-theme="club"] .brand {
+  color: #ebdfaf;
+}
+[data-theme="club"] .side-label {
+  color: #97ae80;
+}
+[data-theme="club"] .nav {
+  color: #a2bea8;
+  background: transparent;
+  border-color: transparent;
+}
+[data-theme="club"] .nav.selected {
+  background: linear-gradient(90deg, #254c31, #183b28);
+  color: #e9db9c;
+  box-shadow: inset 3px 0 #bca86c;
+}
+[data-theme="club"] .nav:hover:not(:disabled) {
+  background: #284d33;
+  color: #f1e9c5;
+}
+[data-theme="club"] .soon {
+  border-color: #284531;
+}
+[data-theme="club"] .soon p,
+[data-theme="club"] .soon small,
+[data-theme="club"] .sidebar-bottom {
+  color: #88a48c;
+}
+[data-theme="club"] .sidebar-close,
+[data-theme="club"] .menu-toggle {
+  background: transparent;
+  color: #c4d8bd;
+  border-color: transparent;
+}
+[data-theme="club"] .room-badge {
+  background: #163221;
+  border-color: #3d5937;
+  color: #d2e0bd;
+}
+[data-theme="club"] .status-dot {
+  background: #6cd395;
+  box-shadow: 0 0 8px #56d78b44;
+}
+[data-theme="club"] .badge {
+  color: #d3bd78;
+  border-color: #5e623c;
+  background: #292d1b;
+}
+[data-theme="club"] .game-area {
+  background: radial-gradient(ellipse at 50% 45%, #234730, #0c2216 78%);
+  border-color: #3b5134;
+  box-shadow:
+    inset 0 1px 0 #c1ae5e22,
+    0 15px 40px #0002;
+}
+[data-theme="club"] .table-topline,
+[data-theme="club"] .table-footer {
+  color: #a2b48c;
+}
+[data-theme="club"] .table-topline b {
+  color: #9d9867;
+}
+[data-theme="club"] .felt {
+  background: radial-gradient(ellipse at 50% 35%, #24754b, #10462c 80%);
+  border-color: #465b35;
+  box-shadow:
+    0 5px 0 #223b24,
+    0 11px 0 #6b6b40,
+    0 22px 35px #0006,
+    inset 0 0 55px #04221966;
+}
+[data-theme="club"] .felt:before {
+  border-color: #c7ad6466;
+}
+[data-theme="club"] .felt-inner {
+  border-color: #bfd09b3d;
+}
+[data-theme="club"] .table-wordmark {
+  color: #d0cc9455;
+}
+[data-theme="club"] .pot,
+[data-theme="club"] .pot strong {
+  color: #f3e8b9;
+  text-shadow: 0 2px 8px #04150d66;
+}
+[data-theme="club"] .pot small {
+  color: #d2d4a4;
+}
+[data-theme="club"] .stage {
+  color: #b5d4b0;
+}
+[data-theme="club"] .chair {
+  background: linear-gradient(#3c6045, #23462e);
+  border-color: #193b27;
+  box-shadow:
+    0 6px 0 #142e1e,
+    0 11px 18px #0004;
+}
+[data-theme="club"] .chair:before {
+  background: linear-gradient(#4d7050, #2b5134);
+  border-color: #183c27;
+}
+[data-theme="club"] .empty-seat {
+  color: #c6d7ba;
+}
+[data-theme="club"] .seat-bot {
+  background: #1d412b;
+  color: #d3e7c7;
+  border-color: #53734a;
+}
+[data-theme="club"] .player {
+  background: linear-gradient(145deg, #21452f, #132d20);
+  border-color: #5c7046;
+  box-shadow: 0 5px 14px #0005;
+}
+[data-theme="club"] .player b {
+  color: #e9efdb;
+}
+[data-theme="club"] .player div > span {
+  color: #e4d191;
+}
+[data-theme="club"] .acting .player {
+  outline-color: #d9c27b;
+  box-shadow: 0 0 28px #5cd29728;
+}
+[data-theme="club"] .seat-info {
+  background: #173824ed;
+  color: #bad2ac;
+}
+[data-theme="club"] .acting .seat-info {
+  background: #d6c47f;
+  color: #203b22;
+}
+[data-theme="club"] .dealer {
+  background: #e4d299;
+  border-color: #887b46;
+  color: #283d24;
+}
+[data-theme="club"] .chip-legend > span {
+  color: #aec397;
+}
+[data-theme="club"] .table-tools {
+  background: #10281b;
+  border-color: #3c5738;
+  box-shadow: 0 10px 30px #0003;
+}
+[data-theme="club"] .tool-tabs {
+  background: #193824;
+  border-color: #365436;
+}
+[data-theme="club"] .tool-tabs button {
+  background: transparent;
+  color: #adc6aa;
+  border-color: transparent;
+}
+[data-theme="club"] .tool-tabs button[aria-selected="true"] {
+  background: #305537;
+  color: #efe2ac;
+  border-color: #687549;
+  box-shadow: 0 2px 8px #0002;
+}
+[data-theme="club"] .tool-tabs button:hover:not(:disabled) {
+  background: #294d32;
+  color: #eff2d8;
+}
+[data-theme="club"] .side-odds .eyebrow {
+  color: #9bb98b;
+}
+[data-theme="club"] .odds-meta {
+  background: #1d3a25;
+  color: #cadab2;
+}
+[data-theme="club"] .odds-meta small {
+  color: #99b18e;
+}
+[data-theme="club"] .odds-row {
+  border-color: #2d4930;
+}
+[data-theme="club"] .odds-chance strong {
+  color: #e5d299;
+}
+[data-theme="club"] .example-cards span {
+  background: #e9efdc;
+  border-color: #9aaa83;
+  color: #29442e;
+}
+[data-theme="club"] .example-cards span.red {
+  color: #b44d44;
+}
+[data-theme="club"] .current-combination {
+  background: #21442b;
+}
+[data-theme="club"] .odds-name > small {
+  background: #536b35;
+  color: #edf1cc;
+}
+[data-theme="club"] .panel-title {
+  color: #e0e8d1;
+}
+[data-theme="club"] .panel-title > span,
+[data-theme="club"] .turn-box > span {
+  color: #b2c39d;
+}
+[data-theme="club"] .turn-box {
+  border-color: #365136;
+}
+[data-theme="club"] .turn-box strong {
+  color: #e2ce8f;
+}
+[data-theme="club"] .history > div {
+  color: #a4b999;
+}
+[data-theme="club"] .history .latest {
+  color: #e3dfb4;
+}
+[data-theme="club"] .history i {
+  background: #4c6c45;
+}
+[data-theme="club"] .history .latest i {
+  background: #d0bd74;
+}
+[data-theme="club"] .action-bar,
+[data-theme="club"] .join-bar {
+  background: linear-gradient(130deg, #163923, #10291c);
+  border-color: #537345;
+  box-shadow: 0 8px 40px #0005;
+}
+[data-theme="club"] .action-bar.your-turn {
+  background: linear-gradient(115deg, #22452a, #153b26);
+  border-color: #b2a165;
+  box-shadow:
+    0 0 0 3px #a2ac5422,
+    0 10px 40px #0005;
+}
+[data-theme="club"] .your-hand small,
+[data-theme="club"] .your-turn .your-hand small {
+  color: #dfcc8d;
+}
+[data-theme="club"] .your-hand strong {
+  color: #eef2d9;
+}
+[data-theme="club"] .your-hand div > span {
+  color: #a2be97;
+}
+[data-theme="club"] .raise-heading label {
+  color: #c0d0a7;
+}
+[data-theme="club"] .raise-presets button {
+  background: #284a2e;
+  border-color: #47683c;
+  color: #c9dcb7;
+}
+[data-theme="club"] .raise-control input[type="range"] {
+  accent-color: #6ee6a6;
+}
+[data-theme="club"] .action-buttons button {
+  background: linear-gradient(#285b3a, #1c462d);
+  border-color: #598252;
+  color: #e2efcf;
+  box-shadow: 0 4px 0 #0b2b19;
+}
+[data-theme="club"] .action-buttons button:hover:not(:disabled) {
+  background: linear-gradient(#347147, #285737);
+  box-shadow: 0 6px 0 #102e1c;
+}
+[data-theme="club"] .action-buttons .primary {
+  background: linear-gradient(#73e3a0, #38b67b);
+  border-color: #83d9a1;
+  color: #082f1a;
+  box-shadow:
+    0 4px 0 #168051,
+    0 5px 24px #49e39a22;
+}
+[data-theme="club"] .action-buttons .primary:hover:not(:disabled) {
+  background: linear-gradient(#8defb3, #51ca8d);
+  box-shadow:
+    0 6px 0 #1b8d58,
+    0 5px 28px #49e39a33;
+}
+[data-theme="club"] .action-buttons .fold-button {
+  background: linear-gradient(#483429, #36291f);
+  border-color: #82604a;
+  color: #edc1a5;
+  box-shadow: 0 4px 0 #231c13;
+}
+[data-theme="club"] .action-buttons button:disabled {
+  box-shadow: 0 2px 0 #0a2114;
+}
+[data-theme="club"] .result {
+  background: #2a492a;
+  color: #eadca6;
+  border: 1px solid #68794b;
+}
+[data-theme="club"] .admin-panel {
+  background: #112c1d;
+  border-color: #37573a;
+}
+[data-theme="club"] .admin-player {
+  border-color: #365337;
+}
+[data-theme="club"] .bot-label {
+  background: #3b572e;
+  color: #e5e4b0;
+}
+[data-theme="club"] .sound-toggle,
+[data-theme="club"] .theme-toggle {
+  background: #183824;
+  color: #d6dfb9;
+  border-color: #3c5e3a;
+}
+[data-theme="club"] .theme-toggle {
+  color: #e2ce8d;
+}
+[data-theme="club"] .sound-toggle[aria-pressed="false"] {
+  color: #8da386;
+}
+[data-theme="club"] .bottom-note {
+  color: #7e9979;
+}
+[data-theme="club"] .error {
+  background: #422b25;
+  border: 1px solid #815545;
+  color: #f1bd9d;
+}
+[data-theme="club"] .error button,
+[data-theme="club"] .close-tool {
+  background: transparent;
+  border-color: transparent;
+}
+[data-theme="club"] .loading {
+  background: #0a1912;
+  color: #c9d9b5;
+}
+[data-theme="club"] .activity {
+  background: #10281b;
+}
+[data-theme="club"] .table-tools:not(.tools-open) .tool-tabs {
+  background: #133422ed;
+  border-color: #375738;
+}

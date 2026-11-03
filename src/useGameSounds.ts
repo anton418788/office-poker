@@ -40,13 +40,17 @@ export function useGameSounds(game: View | null) {
   );
   useEffect(() => {
     if (!game) return;
+    let delay = 0;
     soundEvents(previous.current, game)
       .filter(
         (sound) =>
           !(game.dealAnimations && sound === "cards") &&
           !(["turn", "payout"].includes(sound) && isDealing(game)),
       )
-      .forEach((sound, i) => player.current?.play(sound, i * 0.12));
+      .forEach((sound) => {
+        player.current?.play(sound, delay);
+        delay += sound === "check" ? 0.38 : 0.12;
+      });
     previous.current = game;
   }, [game]);
   return {

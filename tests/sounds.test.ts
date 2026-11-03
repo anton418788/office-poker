@@ -29,7 +29,7 @@ test("Колл воспроизводит фишки, флоп — карты; �
   const after = view(g, "b", false);
   assert.deepEqual(soundEvents(before, after), ["chips", "turn"]);
   action(g, "b", "check");
-  assert.deepEqual(soundEvents(after, view(g, "b", false)), ["cards"]);
+  assert.deepEqual(soundEvents(after, view(g, "b", false)), ["check", "cards"]);
 });
 test("Пауза не даёт сигнал; возобновление своего хода даёт", () => {
   const g = setup();
@@ -38,4 +38,37 @@ test("Пауза не даёт сигнал; возобновление свое
   const paused = { ...before, paused: true };
   assert.deepEqual(soundEvents(before, paused), []);
   assert.deepEqual(soundEvents(paused, before), ["turn"]);
+});
+test("Каждый чек даёт двойной стук один раз, включая чек бота и смену улицы", () => {
+  const g = setup();
+  g.players[1].bot = true;
+  start(g);
+  action(g, "a", "call");
+  const before = view(g, "a", false);
+  action(g, "b", "check");
+  const after = view(g, "a", false);
+  assert.ok(soundEvents(before, after).includes("check"));
+  assert.equal(after.checks?.at(-1)?.seat, 1);
+  assert.equal(
+    soundEvents(before, after).filter((s) => s === "check").length,
+    1,
+  );
+  assert.deepEqual(soundEvents(after, structuredClone(after)), []);
+  assert.deepEqual(soundEvents(null, after), []);
+});
+test("Несколько чеков между обновлениями не теряются; запрещённый чек не создаёт звук", () => {
+  const g = setup();
+  start(g);
+  assert.throws(() => action(g, "a", "check"));
+  assert.equal(g.checkSeq, undefined);
+  action(g, "a", "call");
+  action(g, "b", "check");
+  const before = view(g, "a", false);
+  action(g, "b", "check");
+  action(g, "a", "check");
+  const after = view(g, "a", false);
+  assert.equal(
+    soundEvents(before, after).filter((s) => s === "check").length,
+    2,
+  );
 });

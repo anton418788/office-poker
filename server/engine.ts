@@ -1,6 +1,7 @@
 import type { Game, Player, View } from "../shared/types.js";
 import { deck, evaluate, compare, combinations } from "./poker.js";
 import { bestFive } from "../shared/poker.js";
+import { winningHighlights } from "../shared/winners.js";
 import {
   cardMoves,
   dealOrder,
@@ -227,10 +228,7 @@ export function settle(g: Game) {
     winners: [...winningIds].map((id) => {
       const p = g.players.find((p) => p.id === id)!;
       const best = byFold ? null : bestFive([...p.cards, ...g.board]);
-      const includes = (c: (typeof g.board)[number]) =>
-        best?.cards.some(
-          (card) => card.rank === c.rank && card.suit === c.suit,
-        ) ?? false;
+      const highlights = winningHighlights(best?.cards ?? [], g.board, p.cards);
       return {
         id: p.id,
         name: p.name,
@@ -242,8 +240,7 @@ export function settle(g: Game) {
             : combinations[best.score[0]]
           : null,
         cards: best?.cards ?? [],
-        boardIndexes: g.board.flatMap((c, i) => (includes(c) ? [i] : [])),
-        holeIndexes: p.cards.flatMap((c, i) => (includes(c) ? [i] : [])),
+        ...highlights,
       };
     }),
   };

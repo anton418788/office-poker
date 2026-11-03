@@ -2545,3 +2545,12 @@ h1 {
     bottom: calc(46% + 26px);
   }
 }
+/* Card paths run as compositor-friendly transforms, independently of React polling. */
+.dealing-card {
+  left: 0;
+  top: 0;
+  transition: none;
+  will-change: transform;
+  filter: none;
+  contain: layout style;
+}

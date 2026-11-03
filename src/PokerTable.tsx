@@ -9,7 +9,8 @@ import type { ChipTransfer, View } from "../shared/types";
 import { denominations, chipBreakdown } from "../shared/chips";
 import { Card } from "./Card";
 import { WinnerCrown } from "./WinnerCrown";
-import { crownWinners } from "../shared/winners";
+import { crownWinners, winningHighlights } from "../shared/winners";
+import { CardFlight } from "./CardFlight";
 import { Chip, ChipPile } from "./ChipPile";
 import type { useDealPresentation } from "./useDealPresentation";
 const format = (n: number) => n.toLocaleString("ru-RU");
@@ -48,6 +49,7 @@ export function PokerTable({
     !["waiting", "showdown"].includes(g.phase) || presentation.active;
   const sceneRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(() => window.innerWidth <= 680);
+  const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
   const [anchors, setAnchors] = useState<Record<string, [number, number]>>({});
   useLayoutEffect(() => {
     const scene = sceneRef.current;
@@ -56,6 +58,11 @@ export function PokerTable({
       const bounds = scene.getBoundingClientRect(),
         parent = scene.parentElement!.getBoundingClientRect();
       setCompact(parent.width <= 650);
+      setSceneSize((previous) =>
+        previous.width === bounds.width && previous.height === bounds.height
+          ? previous
+          : { width: bounds.width, height: bounds.height },
+      );
       const next: Record<string, [number, number]> = {};
       scene.querySelectorAll(".seat-cards,.board-slot").forEach((el) => {
         const rect = el.getBoundingClientRect(),
@@ -120,17 +127,19 @@ export function PokerTable({
       setFlights((current) =>
         current.map((f) => ({ ...f, expiresAt: f.expiresAt + shift })),
       );
+      return;
     }
     if (!flights.length) return;
-    const timer = setInterval(
+    const expires = Math.min(...flights.map((f) => f.expiresAt));
+    const timer = setTimeout(
       () =>
         setFlights((current) =>
           current.filter((f) => f.expiresAt > Date.now()),
         ),
-      100,
+      Math.max(1, expires - Date.now() + 1),
     );
-    return () => clearInterval(timer);
-  }, [g.paused, flights.length > 0]);
+    return () => clearTimeout(timer);
+  }, [g.paused, flights]);
   const pot = g.players.reduce((n, p) => n + p.total, 0);
   const crowns = crownWinners(g, presentation.active);
   const shownResult =
@@ -139,8 +148,18 @@ export function PokerTable({
     g.lastResult?.hand === g.hand
       ? g.lastResult
       : null;
+  const highlights = new Map(
+    (shownResult?.winners ?? []).map((w) => [
+      w.id,
+      winningHighlights(
+        w.cards,
+        g.board,
+        g.players.find((p) => p.id === w.id)?.cards ?? [],
+      ),
+    ]),
+  );
   const winningBoard = new Set(
-    shownResult?.winners.flatMap((w) => w.boardIndexes) ?? [],
+    [...highlights.values()].flatMap((h) => h.boardIndexes),
   );
   const summaries = new Map<string, string[]>();
   for (const winner of shownResult?.winners ?? []) {
@@ -216,7 +235,7 @@ export function PokerTable({
         {locations.map(([x, y], seat) => {
           const p = g.players.find((p) => p.seat === seat);
           const winningHole =
-            shownResult?.winners.find((w) => w.id === p?.id)?.holeIndexes ?? [];
+            (p ? highlights.get(p.id)?.holeIndexes : []) ?? [];
           const visibleChips = p
             ? Math.max(
                 0,
@@ -352,38 +371,25 @@ export function PokerTable({
               if (anchor)
                 target[0] +=
                   (((move.index - 0.5) * (compact ? 34 : 41)) /
-                    (sceneRef.current?.clientWidth ?? 800)) *
+                    (sceneSize.width || 800)) *
                   100;
               else {
                 target[0] += (move.index - 0.5) * 4;
                 target[1] -= 11;
               }
             }
-            const t = Math.max(
-                0,
-                Math.min(
-                  1,
-                  (presentation.clock - move.start) / (move.land - move.start),
-                ),
-              ),
-              ease = 1 - Math.pow(1 - t, 2);
             return (
-              <div
+              <CardFlight
                 key={move.key}
-                className="dealing-card"
-                data-deal-to={
-                  move.kind === "hole"
-                    ? `seat-${move.seat}`
-                    : `board-${move.index}`
+                move={move}
+                from={origin}
+                to={target}
+                width={sceneSize.width}
+                height={sceneSize.height}
+                pausedAt={
+                  g.paused ? (g.deal?.pausedAt ?? Date.now()) : undefined
                 }
-                style={{
-                  left: `${origin[0] + (target[0] - origin[0]) * ease}%`,
-                  top: `${origin[1] + (target[1] - origin[1]) * ease - Math.sin(Math.PI * t) * 5}%`,
-                  transform: `translate(-50%,-50%) rotate(${-12 + Math.sin(t * Math.PI) * 20 + (move.kind === "hole" ? (move.index - 0.5) * 8 : 0)}deg)`,
-                }}
-              >
-                <Card back small />
-              </div>
+              />
             );
           })}
         </div>

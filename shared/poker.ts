@@ -80,3 +80,17 @@ export function bestFive(cards: Card[]): { cards: Card[]; score: number[] } {
           }
   return { cards: best, score };
 }
+
+/** Visual combination only: kickers still remain in evaluate()/bestFive(). */
+export function combinationCards(cards: Card[]): Card[] {
+  if (cards.length < 5) return [];
+  const score = evaluate(cards),
+    category = score[0];
+  if ([4, 5, 6, 8].includes(category)) return cards;
+  if (category === 0)
+    return cards.filter((c) => c.rank === score[1]).slice(0, 1);
+  const required = category === 7 ? 4 : category === 3 ? 3 : 2;
+  return cards.filter(
+    (c) => cards.filter((other) => other.rank === c.rank).length === required,
+  );
+}

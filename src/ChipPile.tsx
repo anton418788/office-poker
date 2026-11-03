@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import { chipBreakdown, chipColors } from "../shared/chips";
 export function Chip({
   value,
@@ -22,7 +22,7 @@ export function Chip({
     </span>
   );
 }
-export function ChipPile({
+export const ChipPile = memo(function ChipPile({
   amount,
   compact = false,
 }: {
@@ -57,4 +57,4 @@ export function ChipPile({
       ))}
     </div>
   );
-}
+});

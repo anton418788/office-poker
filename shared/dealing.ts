@@ -94,3 +94,19 @@ export function dealFrame(
     clock,
   };
 }
+
+/** React updates only when cards start/land/flip, never on each animation frame. */
+export function nextDealUpdate(
+  plan: DealPresentation,
+  now: number,
+): number | null {
+  if (plan.pausedAt !== undefined || now >= plan.endsAt) return null;
+  const events = [
+    plan.endsAt,
+    ...cardMoves(plan).flatMap((m) =>
+      m.kind === "board" ? [m.start, m.land, m.flip] : [m.start, m.land],
+    ),
+  ];
+  const future = events.filter((time) => time > now);
+  return future.length ? Math.min(...future) : null;
+}

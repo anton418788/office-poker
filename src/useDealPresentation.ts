@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { cardMoves, dealFrame, isDealing } from "../shared/dealing";
+import { cardMoves, dealFrame, nextDealUpdate } from "../shared/dealing";
 import type { View } from "../shared/types";
 import type { GameSound } from "../shared/sound-events";
 export function useDealPresentation(
@@ -12,14 +12,18 @@ export function useDealPresentation(
   const plan = game?.deal,
     frame = dealFrame(plan, game?.hand ?? 0, game?.board.length ?? 0, now);
   useEffect(() => {
-    setNow(Date.now());
-    if (!game || !isDealing(game) || game.paused) return;
-    const timer = setInterval(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
       const clock = Date.now();
       setNow(clock);
-      if (plan && clock >= plan.endsAt) clearInterval(timer);
-    }, 40);
-    return () => clearInterval(timer);
+      if (!plan || game?.paused) return;
+      const next = nextDealUpdate(plan, clock);
+      if (next !== null) timer = setTimeout(update, Math.max(1, next - clock));
+    };
+    update();
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [plan?.id, plan?.startedAt, plan?.endsAt, game?.paused]);
   useEffect(() => {
     if (!plan || !game) return;

@@ -19,7 +19,7 @@ export function InventoryPanel({
   busy: boolean;
   error: string;
   onBack: () => void;
-  onEquip: (slot: CosmeticSlot, id: string) => Promise<boolean>;
+  onEquip: (slot: CosmeticSlot, id: string | null) => Promise<boolean>;
 }) {
   const [slot, setSlot] = useState<CosmeticSlot>("chair");
   const [notice, setNotice] = useState("");
@@ -72,18 +72,56 @@ export function InventoryPanel({
         >
           ♠ Рубашка карт
         </button>
+        <button
+          role="tab"
+          id="accessories-tab"
+          aria-controls="inventory-items"
+          aria-selected={slot === "accessory"}
+          onClick={() => {
+            setSlot("accessory");
+            setNotice("");
+          }}
+        >
+          ♢ Аксессуары
+        </button>
       </div>
       <p className="inventory-note">
         {slot === "chair"
           ? "Выбранная сидушка следует за вами. Когда вы встаёте, кресло снова становится обычным."
-          : "Когда вы дилер, все карты этой раздачи получают вашу рубашку. Изменение выбора применяется к следующей вашей раздаче."}
+          : slot === "deck"
+            ? "Когда вы дилер, все карты этой раздачи получают вашу рубашку. Изменение выбора применяется к следующей вашей раздаче."
+            : "Один выбранный предмет появляется на сукне рядом с вами. Когда вы покидаете место, аксессуар тоже исчезает. Способ получения появится позже; в кейсах аксессуаров нет."}
         {admin && <span> Все предметы всегда доступны администратору.</span>}
       </p>
+      {slot === "accessory" && (
+        <div className="accessory-selection">
+          <span>
+            {inventory.equipped.accessory
+              ? "Аксессуар выбран"
+              : "Без аксессуара"}
+          </span>
+          <button
+            disabled={busy || !inventory.equipped.accessory}
+            onClick={async () => {
+              if (await onEquip("accessory", null))
+                setNotice("Аксессуар снят.");
+            }}
+          >
+            Снять аксессуар
+          </button>
+        </div>
+      )}
       <div
         className="inventory-grid"
         id="inventory-items"
         role="tabpanel"
-        aria-labelledby={slot === "chair" ? "chairs-tab" : "decks-tab"}
+        aria-labelledby={
+          slot === "chair"
+            ? "chairs-tab"
+            : slot === "deck"
+              ? "decks-tab"
+              : "accessories-tab"
+        }
       >
         {cosmeticItems
           .filter((item) => item.slot === slot)
@@ -129,7 +167,9 @@ export function InventoryPanel({
                       setNotice(
                         slot === "chair"
                           ? `Сидушка «${item.name}» выбрана.`
-                          : `Рубашка «${item.name}» выбрана для следующих раздач, где вы дилер.`,
+                          : slot === "deck"
+                            ? `Рубашка «${item.name}» выбрана для следующих раздач, где вы дилер.`
+                            : `Аксессуар «${item.name}» выбран.`,
                       );
                   }}
                 >

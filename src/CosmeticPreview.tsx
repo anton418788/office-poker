@@ -1,5 +1,6 @@
 import type { CosmeticItem } from "../shared/cosmetics";
 import { Card } from "./Card";
+import { AccessoryArt } from "./AccessoryArt";
 export function CosmeticPreview({ item }: { item: CosmeticItem | null }) {
   if (!item)
     return (
@@ -7,6 +8,7 @@ export function CosmeticPreview({ item }: { item: CosmeticItem | null }) {
         —
       </span>
     );
+  if (item.slot === "accessory") return <AccessoryArt itemId={item.id} />;
   return item.slot === "chair" ? (
     <div className="chair" data-chair={item.id} aria-hidden="true">
       <i />

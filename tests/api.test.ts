@@ -10,6 +10,90 @@ import { join as pathJoin } from "node:path";
 import { tokenHash } from "../server/accounts.js";
 const password = "test-password-123";
 const rules = { small: 10, big: 20, minutes: 10, step: 10 };
+test("Аксессуар: миграция старого выбора, владение, отображение за столом, снятие и перезапуск", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-accessory-")),
+    path = pathJoin(dir, "game.sqlite");
+  let s = await open(path);
+  try {
+    const admin = await s.setup(),
+      regular = await s.add(admin, "accessory_user");
+    await s.call(admin, "inventory/equip", {
+      slot: "chair",
+      itemId: "chair-ocean",
+    });
+    await s.close();
+    // Recreate the previous equipment schema, keeping the account and its choice.
+    let db = new DatabaseSync(path);
+    db.exec("ALTER TABLE user_equipment DROP COLUMN accessory");
+    db.close();
+    s = await open(path);
+    const old = (await s.call(admin, "state")).data.inventory.equipped;
+    assert.equal(old.chair, "chair-ocean");
+    assert.equal(old.accessory, null);
+    assert.equal(
+      (
+        await s.call(regular.cookie, "inventory/equip", {
+          slot: "accessory",
+          itemId: "accessory-phone",
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "inventory/equip", {
+          slot: "accessory",
+          itemId: "deck-classic",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await s.call(admin, "inventory/equip", { slot: "chair", itemId: null }))
+        .status,
+      400,
+    );
+    db = new DatabaseSync(path);
+    db.prepare("INSERT INTO user_items VALUES(?,?)").run(
+      regular.user.id,
+      "accessory-phone",
+    );
+    db.close();
+    await s.create(regular.cookie);
+    const chosen = await s.call(regular.cookie, "inventory/equip", {
+      slot: "accessory",
+      itemId: "accessory-phone",
+    });
+    assert.equal(chosen.status, 200);
+    assert.equal(
+      chosen.data.activeRoom.players.find((p: any) => p.id === regular.user.id)
+        .appearance.accessory,
+      "accessory-phone",
+    );
+    await s.close();
+    s = await open(path);
+    assert.equal(
+      (await s.call(regular.cookie, "state")).data.inventory.equipped.accessory,
+      "accessory-phone",
+    );
+    const cleared = await s.call(regular.cookie, "inventory/equip", {
+      slot: "accessory",
+      itemId: null,
+    });
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.data.inventory.equipped.accessory, null);
+    assert.equal(
+      cleared.data.activeRoom.players.find((p: any) => p.id === regular.user.id)
+        .appearance.accessory,
+      null,
+    );
+    assert.equal(cleared.data.inventory.equipped.chair, "chair-classic");
+    assert.equal(cleared.data.account.balance, 2000);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
 async function open(
   path = ":memory:",
   now?: () => number,
@@ -601,15 +685,16 @@ test("Инвентарь: у обычного игрока две базовые
     assert.deepEqual(initial.equipped, {
       chair: "chair-classic",
       deck: "deck-classic",
+      accessory: null,
     });
     const all = (await s.call(admin, "state")).data.inventory;
-    assert.equal(all.owned.length, 8);
-    assert.equal(new Set(all.owned).size, 8);
+    assert.equal(all.owned.length, 23);
+    assert.equal(new Set(all.owned).size, 23);
     for (const item of all.owned)
       assert.equal(
         (
           await s.call(admin, "inventory/equip", {
-            slot: item.startsWith("chair-") ? "chair" : "deck",
+            slot: item.split("-")[0],
             itemId: item,
           })
         ).status,
@@ -1038,7 +1123,7 @@ test("Администратор уже владеет всеми предмет
     assert.equal(result.data.caseOpening.duplicate, true);
     assert.equal(result.data.caseOpening.compensation, 500);
     assert.equal(result.data.account.balance, 2000);
-    assert.equal(result.data.inventory.owned.length, 8);
+    assert.equal(result.data.inventory.owned.length, 23);
   } finally {
     await s.close();
   }

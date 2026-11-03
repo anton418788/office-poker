@@ -17,6 +17,19 @@ export function viewSeat(realSeat: number, viewerSeat?: number) {
 export function seatAtView(position: number, viewerSeat?: number) {
   return (position + anchor(viewerSeat)) % 6;
 }
+/** Inside the rail, away from hole cards, dealer decks and the central board. */
+export function accessoryPoint(realSeat: number, viewerSeat?: number) {
+  return (
+    [
+      [32, 77],
+      [28, 72],
+      [28, 26],
+      [32, 25],
+      [72, 26],
+      [72, 72],
+    ] as const
+  )[viewSeat(realSeat, viewerSeat)]!;
+}
 export function seatPoint(
   realSeat: number,
   viewerSeat?: number,

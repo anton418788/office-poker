@@ -107,6 +107,14 @@ export function createApp(
     CREATE TABLE IF NOT EXISTS case_openings (userId TEXT NOT NULL, requestId TEXT NOT NULL, caseId TEXT NOT NULL, json TEXT NOT NULL, openedAt INTEGER NOT NULL, PRIMARY KEY(userId,requestId));
     CREATE INDEX IF NOT EXISTS case_openings_user_time ON case_openings(userId,openedAt DESC);
     CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  if (
+    !(
+      db.prepare("PRAGMA table_info(user_equipment)").all() as {
+        name: string;
+      }[]
+    ).some((column) => column.name === "accessory")
+  )
+    db.exec("ALTER TABLE user_equipment ADD COLUMN accessory TEXT");
   const transaction = (fn: () => void) => {
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -185,17 +193,20 @@ export function createApp(
       ? cosmeticItems.map((item) => item.id)
       : [
           ...new Set([
-            ...Object.values(defaultAppearance),
+            defaultAppearance.chair,
+            defaultAppearance.deck,
             ...extras.filter((id) => cosmeticItem(id)),
           ]),
         ];
     const saved = db
-      .prepare("SELECT chair,deck FROM user_equipment WHERE userId=?")
+      .prepare("SELECT chair,deck,accessory FROM user_equipment WHERE userId=?")
       .get(u.id) as Appearance | undefined;
     const equipped = normalizeAppearance(saved);
     if (!owned.includes(equipped.chair))
       equipped.chair = defaultAppearance.chair;
     if (!owned.includes(equipped.deck)) equipped.deck = defaultAppearance.deck;
+    if (equipped.accessory && !owned.includes(equipped.accessory))
+      equipped.accessory = null;
     return { owned, equipped };
   };
   // Older rooms acquire the same account appearance without changing the hand's deck.
@@ -447,24 +458,23 @@ export function createApp(
   app.post("/api/inventory/equip", requireUser, (req, res) => {
     const u: UserRow = res.locals.account;
     const { slot, itemId } = req.body ?? {};
-    if (slot !== "chair" && slot !== "deck")
+    if (slot !== "chair" && slot !== "deck" && slot !== "accessory")
       fail("Неизвестная категория предмета");
     const item = cosmeticItem(itemId, slot);
-    if (!item) fail("Предмет не найден");
+    const clearing = slot === "accessory" && itemId === null;
+    if (!item && !clearing) fail("Предмет не найден");
     const inventory = inventoryFor(u);
-    if (!inventory.owned.includes(item.id))
+    if (item && !inventory.owned.includes(item.id))
       fail("Этого предмета пока нет в вашем инвентаре", 403);
-    const equipped = { ...inventory.equipped, [slot]: item.id };
+    const equipped = { ...inventory.equipped, [slot]: item?.id ?? null };
     const active = occupied(u.id);
     const next = active ? structuredClone(active) : null;
     if (next)
       next.game.players.find((p) => p.id === u.id)!.appearance = equipped;
     transaction(() => {
-      db.prepare("INSERT OR REPLACE INTO user_equipment VALUES(?,?,?)").run(
-        u.id,
-        equipped.chair,
-        equipped.deck,
-      );
+      db.prepare(
+        "INSERT OR REPLACE INTO user_equipment (userId,chair,deck,accessory) VALUES(?,?,?,?)",
+      ).run(u.id, equipped.chair, equipped.deck, equipped.accessory);
       if (next)
         db.prepare("UPDATE rooms SET json=? WHERE id=?").run(
           JSON.stringify(next),

@@ -1,7 +1,17 @@
 import { ParticipantMenu } from "./ParticipantMenu";
-import { tableLocations, seatAtView, seatPoint } from "../shared/table-layout";
+import {
+  tableLocations,
+  seatAtView,
+  seatPoint,
+  accessoryPoint,
+} from "../shared/table-layout";
 import { potAmount } from "../shared/pot";
-import { normalizeAppearance, defaultAppearance } from "../shared/cosmetics";
+import {
+  normalizeAppearance,
+  defaultAppearance,
+  cosmeticItem,
+} from "../shared/cosmetics";
+import { AccessoryArt } from "./AccessoryArt";
 import {
   useEffect,
   useLayoutEffect,
@@ -231,6 +241,24 @@ export function PokerTable({
             )}
           </div>
         </div>
+        {g.players.map((p) => {
+          const item = cosmeticItem(p.appearance?.accessory, "accessory");
+          if (!item) return null;
+          const [x, y] = accessoryPoint(p.seat, viewerSeat);
+          return (
+            <div
+              key={p.id}
+              className="table-accessory"
+              role="img"
+              aria-label={`${p.name}: ${item.name}`}
+              data-owner={p.id}
+              data-accessory={item.id}
+              style={{ left: `${x}%`, top: `${y}%` }}
+            >
+              <AccessoryArt itemId={item.id} />
+            </div>
+          );
+        })}
         {tableLocations.map((_location, position) => {
           const seat = seatAtView(position, viewerSeat);
           const [x, y] = point(seat);

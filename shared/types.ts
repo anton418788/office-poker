@@ -3,6 +3,7 @@ export type Player = {
   id: string;
   name: string;
   seat: number;
+  bot?: boolean;
   chips: number;
   cards: Card[];
   folded: boolean;

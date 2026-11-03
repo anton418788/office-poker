@@ -28,12 +28,25 @@ export const live = (g: Game) =>
   g.players.filter((p) => p.cards.length && !p.folded);
 const able = (g: Game) => live(g).filter((p) => p.chips > 0);
 export const running = (g: Game) => !["waiting", "showdown"].includes(g.phase);
-export function join(g: Game, id: string, name: string) {
+export function join(
+  g: Game,
+  id: string,
+  name: string,
+  requestedSeat?: number,
+) {
   if (g.players.length >= 6) throw Error("За столом уже 6 игроков");
   if (g.players.some((p) => p.id === id)) throw Error("Вы уже за столом");
-  const seat = [0, 1, 2, 3, 4, 5].find(
-    (s) => !g.players.some((p) => p.seat === s),
-  )!;
+  if (
+    requestedSeat !== undefined &&
+    (!Number.isInteger(requestedSeat) ||
+      requestedSeat < 0 ||
+      requestedSeat > 5 ||
+      g.players.some((p) => p.seat === requestedSeat))
+  )
+    throw Error("Это место недоступно");
+  const seat =
+    requestedSeat ??
+    [0, 1, 2, 3, 4, 5].find((s) => !g.players.some((p) => p.seat === s))!;
   g.players.push({
     id,
     name,

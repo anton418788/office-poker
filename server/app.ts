@@ -8,10 +8,10 @@ import {
   action,
   pause,
   running,
-  tick,
   view,
   log,
 } from "./engine.js";
+import { addBot, step } from "./bots.js";
 import type { Game } from "../shared/types.js";
 export function createApp(path: string) {
   const db = new DatabaseSync(path);
@@ -91,7 +91,7 @@ export function createApp(path: string) {
       const s = res.locals.session;
       const next = structuredClone(game);
       const b = req.body ?? {};
-      tick(next);
+      step(next);
       switch (req.params.command) {
         case "join": {
           if (
@@ -111,6 +111,7 @@ export function createApp(path: string) {
           next.players = next.players.filter((p) => p.id !== s.id);
           break;
         }
+        case "bot":
         case "start":
         case "pause":
         case "settings":
@@ -123,10 +124,13 @@ export function createApp(path: string) {
           if (req.params.command === "start") start(next);
           if (req.params.command === "pause") pause(next);
           if (
-            ["settings", "chips", "remove"].includes(req.params.command) &&
+            ["bot", "settings", "chips", "remove"].includes(
+              req.params.command,
+            ) &&
             running(next)
           )
             throw Error("Это доступно только между раздачами");
+          if (req.params.command === "bot") addBot(next, b.seat);
           if (req.params.command === "settings") {
             const { small, big, stack, minutes } = b;
             if (
@@ -170,11 +174,9 @@ export function createApp(path: string) {
       save(next);
       res.json(view(game, s.id, !!s.admin));
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : "Ошибка запроса",
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Ошибка запроса",
+      });
     }
   });
   app.use(
@@ -187,7 +189,7 @@ export function createApp(path: string) {
   );
   const timer = setInterval(() => {
     const next = structuredClone(game);
-    if (tick(next)) save(next);
+    if (step(next)) save(next);
   }, 1000);
   timer.unref();
   return {

@@ -2669,3 +2669,28 @@ h1 {
     font-size: 9px;
   }
 }
+
+/* The lower rail has its own clearance for the viewer, rack and legend. */
+.table-scene {
+  margin-bottom: 56px;
+}
+.seat-0 .chair {
+  top: calc(50% - 12px);
+}
+.seat-0 .player-action,
+.seat-0 .seat-info {
+  top: 65%;
+  left: calc(100% + 8px);
+  transform: none;
+}
+@media (max-width: 560px) {
+  .table-scene {
+    margin-bottom: 44px;
+  }
+  .seat-0 .player-action,
+  .seat-0 .seat-info {
+    left: calc(100% + 3px);
+    font-size: 9px;
+    max-width: 95px;
+  }
+}

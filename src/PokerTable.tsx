@@ -1,3 +1,4 @@
+import { tableLocations, seatAtView, seatPoint } from "../shared/table-layout";
 import { potAmount } from "../shared/pot";
 import { normalizeAppearance, defaultAppearance } from "../shared/cosmetics";
 import {
@@ -16,14 +17,6 @@ import { CardFlight } from "./CardFlight";
 import { Chip, ChipPile } from "./ChipPile";
 import type { useDealPresentation } from "./useDealPresentation";
 const format = (n: number) => n.toLocaleString("ru-RU");
-const locations = [
-  [50, 79],
-  [10, 68],
-  [10, 29],
-  [50, 7],
-  [90, 29],
-  [90, 68],
-];
 const stages = {
   waiting: "Ждём коллег",
   preflop: "Префлоп",
@@ -50,7 +43,8 @@ export function PokerTable({
   const inHand =
     !["waiting", "showdown"].includes(g.phase) || presentation.active;
   const cardBack = g.cardBack ?? defaultAppearance.deck;
-  const canSit = !g.players.some((p) => p.id === g.me);
+  const viewerSeat = g.players.find((p) => p.id === g.me)?.seat;
+  const canSit = viewerSeat === undefined;
   const sceneRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(() => window.innerWidth <= 680);
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
@@ -72,7 +66,7 @@ export function PokerTable({
         const rect = el.getBoundingClientRect(),
           seat = el.closest(".seat");
         const key = seat
-          ? `seat-${Array.from(scene.querySelectorAll(".seat")).indexOf(seat)}`
+          ? `seat-${seat.getAttribute("data-seat")}`
           : `board-${Array.from(scene.querySelectorAll(".board-slot")).indexOf(el)}`;
         next[key] = [
           ((rect.left + rect.width / 2 - bounds.left) / bounds.width) * 100,
@@ -85,18 +79,15 @@ export function PokerTable({
     const observer = new ResizeObserver(measure);
     observer.observe(scene);
     return () => observer.disconnect();
-  }, [g.hand, g.deal?.id, g.transferSeq]);
-  const point = (seat: number) => {
-    const [x, y] = locations[seat] ?? [50, 17];
-    return [compact ? (x === 10 ? 15 : x === 90 ? 85 : x) : x, y];
-  };
+  }, [g.hand, g.deal?.id, g.transferSeq, viewerSeat]);
+  const point = (seat: number) => seatPoint(seat, viewerSeat, compact);
   const dealer = point(g.dealer),
     origin = [
       dealer[0] < 50
         ? dealer[0] + 15
         : dealer[0] > 50
           ? dealer[0] - 15
-          : dealer[0] + 11,
+          : dealer[0] + (dealer[1] > 50 ? 16 : 11),
       dealer[1] + (50 - dealer[1]) * 0.27,
     ];
   useEffect(() => {
@@ -237,7 +228,9 @@ export function PokerTable({
             )}
           </div>
         </div>
-        {locations.map(([x, y], seat) => {
+        {tableLocations.map((_location, position) => {
+          const seat = seatAtView(position, viewerSeat);
+          const [x, y] = point(seat);
           const p = g.players.find((p) => p.seat === seat);
           const winningHole =
             (p ? highlights.get(p.id)?.holeIndexes : []) ?? [];
@@ -258,7 +251,9 @@ export function PokerTable({
           return (
             <div
               key={seat}
-              className={`seat seat-${seat} ${p?.id === g.actor ? "acting" : ""} ${p?.folded && inHand ? "folded" : ""} ${p ? "occupied" : ""}`}
+              data-seat={seat}
+              data-view-seat={position}
+              className={`seat seat-${position} ${p?.id === g.actor ? "acting" : ""} ${p?.folded && inHand ? "folded" : ""} ${p ? "occupied" : ""}`}
               style={
                 { "--seat-x": `${x}%`, "--seat-y": `${y}%` } as CSSProperties
               }
@@ -454,7 +449,7 @@ export function PokerTable({
         </div>
         <div className="chip-flights" aria-hidden="true">
           {flights.flatMap((flight) => {
-            const seat = locations[flight.seat],
+            const seat = point(flight.seat),
               out = flight.kind === "payout",
               from = out ? [50, 41] : seat,
               to = out ? seat : [50, 41];

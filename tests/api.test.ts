@@ -1139,3 +1139,151 @@ test("Выйти можно во время раздачи карт и на па
     await s.close();
   }
 });
+
+test("Меню участника: обычный игрок не может высадить человека или бота, даже подменяя права", async () => {
+  const s = await open();
+  try {
+    const admin = await s.setup(),
+      host = await s.add(admin, "menu_host"),
+      guest = await s.add(admin, "menu_guest"),
+      stranger = await s.add(admin, "menu_stranger");
+    const room = await s.create(host.cookie),
+      id = room.room.id;
+    await s.call(guest.cookie, `rooms/${id}/join`, {});
+    await s.call(host.cookie, `rooms/${id}/bot`, { seat: 2 });
+    const before = (await s.call(guest.cookie, `rooms/${id}`)).data.room;
+    const bot = before.players.find((p: any) => p.bot);
+    for (const [cookie, target] of [
+      [guest.cookie, host.user.id],
+      [guest.cookie, bot.id],
+      [stranger.cookie, guest.user.id],
+    ])
+      assert.equal(
+        (
+          await s.call(cookie, `rooms/${id}/kick`, {
+            id: target,
+            admin: true,
+            canManage: true,
+          })
+        ).status,
+        403,
+      );
+    const after = (await s.call(host.cookie, `rooms/${id}`)).data.room;
+    assert.equal(after.players.length, 3);
+    assert.equal(after.room.hostId, host.user.id);
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}/kick`, { id: host.user.id }))
+        .status,
+      400,
+    );
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}/kick`, { id: stranger.user.id }))
+        .status,
+      400,
+    );
+    assert.equal(
+      (await s.call("", `rooms/${id}/kick`, { id: guest.user.id })).status,
+      401,
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+test("Хост высаживает человека во время раздачи: фолд, свободное место, сохранение банка и денег", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      host = await s.add(admin, "kick_host"),
+      guest = await s.add(admin, "kick_guest"),
+      other = await s.add(admin, "kick_other");
+    const room = await s.create(host.cookie),
+      id = room.room.id;
+    await s.call(guest.cookie, `rooms/${id}/join`, {});
+    await s.call(other.cookie, `rooms/${id}/join`, {});
+    let g = (await s.call(host.cookie, `rooms/${id}/start`, {})).data.room;
+    time = g.deal.endsAt + 1;
+    const kicked = await s.call(host.cookie, `rooms/${id}/kick`, {
+      id: guest.user.id,
+    });
+    assert.equal(kicked.status, 200);
+    g = kicked.data.room;
+    assert.equal(
+      g.players.some((p: any) => p.id === guest.user.id),
+      false,
+    );
+    assert.equal(g.departedBets[0].total, 10);
+    assert.equal(g.actor, host.user.id);
+    const guestState = (await s.call(guest.cookie, "state")).data;
+    assert.equal(guestState.activeRoom, undefined);
+    assert.equal(guestState.account.balance, 1990);
+    assert.ok(
+      g.log.some((line: string) =>
+        line.includes("высадил участника kick_guest"),
+      ),
+    );
+    assert.equal(
+      g.players.reduce((n: number, p: any) => n + p.chips + p.total, 0) +
+        g.departedBets.reduce((n: number, p: any) => n + p.total, 0) +
+        guestState.account.balance,
+      6000,
+    );
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}/kick`, { id: guest.user.id }))
+        .status,
+      400,
+    );
+    assert.equal(
+      (await s.call(guest.cookie, "state")).data.account.balance,
+      1990,
+    );
+    await s.call(host.cookie, `rooms/${id}/action`, { kind: "fold" });
+    assert.equal(
+      (await s.call(guest.cookie, `rooms/${id}/join`, { seat: 1 })).status,
+      200,
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+test("Администратор может высадить хоста; права переходят оставшемуся игроку, бота можно высадить на паузе", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      host = await s.add(admin, "admin_kick_host"),
+      guest = await s.add(admin, "admin_kick_guest"),
+      room = await s.create(host.cookie),
+      id = room.room.id;
+    await s.call(guest.cookie, `rooms/${id}/join`, {});
+    const kicked = await s.call(admin, `rooms/${id}/kick`, {
+      id: host.user.id,
+    });
+    assert.equal(kicked.status, 200);
+    assert.equal(kicked.data.room.room.hostId, guest.user.id);
+    assert.equal(
+      (await s.call(host.cookie, "state")).data.account.balance,
+      2000,
+    );
+    await s.call(guest.cookie, `rooms/${id}/bot`, { seat: 2 });
+    await s.call(guest.cookie, `rooms/${id}/bot`, { seat: 3 });
+    const started = (await s.call(guest.cookie, `rooms/${id}/start`, {})).data
+      .room;
+    await s.call(guest.cookie, `rooms/${id}/pause`, {});
+    const bot = started.players.find((p: any) => p.bot);
+    const removed = await s.call(guest.cookie, `rooms/${id}/kick`, {
+      id: bot.id,
+    });
+    assert.equal(removed.status, 200);
+    assert.equal(
+      removed.data.room.players.some((p: any) => p.id === bot.id),
+      false,
+    );
+    assert.equal(removed.data.room.paused, true);
+    assert.equal(removed.data.room.deadline, null);
+  } finally {
+    await s.close();
+  }
+});

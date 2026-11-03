@@ -273,6 +273,7 @@ export function GameScreen({
               <PokerTable
                 game={g}
                 busy={busy || presentation.active}
+                participantBusy={busy}
                 send={send}
                 presentation={presentation}
               />

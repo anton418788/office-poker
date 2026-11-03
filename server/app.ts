@@ -650,7 +650,9 @@ export function createApp(
       g = room.game,
       command = String(req.params.command);
     if (
-      ["bot", "start", "pause", "settings", "remove"].includes(command) &&
+      ["bot", "start", "pause", "settings", "remove", "kick"].includes(
+        command,
+      ) &&
       room.hostId !== u.id &&
       !u.admin
     )
@@ -689,15 +691,23 @@ export function createApp(
         g.players = g.players.filter((p) => p.id !== b.id);
         break;
       }
-      case "leave": {
-        withdrawn = leave(g, u.id, now());
-        presence.get(room.id)?.delete(u.id);
-        if (room.hostId === u.id) {
+      case "leave":
+      case "kick": {
+        const targetId = command === "leave" ? u.id : b.id;
+        if (command === "kick" && targetId === u.id)
+          fail("Для выхода используйте кнопку «Выйти из-за стола»");
+        const target = g.players.find((p) => p.id === targetId);
+        if (!target) fail("Участник уже покинул этот стол");
+        withdrawn = leave(g, target.id, now());
+        presence.get(room.id)?.delete(target.id);
+        if (command === "kick")
+          log(g, `${u.name} высадил участника ${target.name} из-за стола`);
+        if (room.hostId === target.id) {
           room.hostId = g.players.find((p) => !p.bot)?.id ?? u.id;
-          if (room.hostId !== u.id)
+          if (room.hostId !== target.id)
             log(
               g,
-              `Хост стола: ${g.players.find((p) => p.id === room.hostId)!.name}`,
+              `Хост стола: ${g.players.find((p) => p.id === room.hostId)?.name ?? u.name}`,
             );
         }
         break;

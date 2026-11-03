@@ -1,3 +1,4 @@
+import { ParticipantMenu } from "./ParticipantMenu";
 import { tableLocations, seatAtView, seatPoint } from "../shared/table-layout";
 import { potAmount } from "../shared/pot";
 import { normalizeAppearance, defaultAppearance } from "../shared/cosmetics";
@@ -29,12 +30,14 @@ type Flight = ChipTransfer & { delay: number; expiresAt: number };
 export function PokerTable({
   game: g,
   busy,
+  participantBusy = busy,
   send,
   presentation,
 }: {
   presentation: ReturnType<typeof useDealPresentation>;
   game: View;
   busy: boolean;
+  participantBusy?: boolean;
   send: (command: string, body?: object) => Promise<void>;
 }) {
   const previous = useRef<number | null>(null),
@@ -297,6 +300,17 @@ export function PokerTable({
                     ) : null}
                   </div>
                   <div className="player">
+                    <ParticipantMenu
+                      name={p.name}
+                      playerId={p.id}
+                      self={p.id === g.me}
+                      canManage={!!g.canManage}
+                      busy={participantBusy}
+                      align={position >= 4 ? "end" : "start"}
+                      onKick={async () => {
+                        await send("kick", { id: p.id });
+                      }}
+                    />
                     <span className={`avatar color-${seat}`}>
                       {p.bot ? "🤖" : p.name.slice(0, 1).toUpperCase()}
                       {crowns.includes(p.id) && <WinnerCrown />}

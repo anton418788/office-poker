@@ -36,7 +36,11 @@ function Card({
 export default function App() {
   const [g, setG] = useState<View | null>(null),
     [error, setError] = useState(""),
-    [tab, setTab] = useState("table"),
+    [tab, setTab] = useState(() =>
+      new URLSearchParams(window.location.search).get("admin") === "1"
+        ? "admin"
+        : "table",
+    ),
     [name, setName] = useState(""),
     [raise, setRaise] = useState(40),
     [busy, setBusy] = useState(false),

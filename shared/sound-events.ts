@@ -3,7 +3,12 @@ export type GameSound =
   "cards" | "chips" | "payout" | "turn" | "deal" | "flip" | "shuffle" | "check";
 // Compare authoritative snapshots so polling the same state never repeats a sound.
 export function soundEvents(previous: View | null, next: View): GameSound[] {
-  if (!previous) return [];
+  if (
+    !previous ||
+    previous.me !== next.me ||
+    previous.room?.id !== next.room?.id
+  )
+    return [];
   const events: GameSound[] = (next.checks ?? [])
     .filter((e) => e.id > (previous.checkSeq ?? 0))
     .map(() => "check");

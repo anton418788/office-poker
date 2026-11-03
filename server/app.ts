@@ -247,25 +247,31 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
     }
     next();
   };
+  const roomView = (room: Room, u: UserRow) => ({
+    ...view(room.game, u.id, !!u.admin),
+    room: {
+      id: room.id,
+      name: room.name,
+      hostId: room.hostId,
+      hostName: user(room.hostId)?.name ?? "Хост",
+    },
+    canManage: room.hostId === u.id || !!u.admin,
+  });
   const state = (res: express.Response, room?: Room): ClubState => {
     const u = res.locals.account ? user(res.locals.account.id) : null;
+    const active = u ? occupied(u.id) : undefined;
+    // A seated player remains present while using any menu, including accounts.
+    if (active && u) touch(active, u.id);
     return {
       account: u ? publicUser(u) : null,
       needsSetup: !initialized(),
       canSetup: !initialized() && res.locals.local,
       rooms: u ? summaries(u.id) : [],
-      ...(room && u
+      ...(room && u ? { room: roomView(room, u) } : {}),
+      ...(active && u
         ? {
-            room: {
-              ...view(room.game, u.id, !!u.admin),
-              room: {
-                id: room.id,
-                name: room.name,
-                hostId: room.hostId,
-                hostName: user(room.hostId)?.name ?? "Хост",
-              },
-              canManage: room.hostId === u.id || !!u.admin,
-            },
+            activeRoom:
+              active.id === room?.id ? roomView(room, u) : roomView(active, u),
           }
         : {}),
     };
@@ -517,8 +523,14 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
       case "leave": {
         g.players = g.players.filter((p) => p.id !== u.id);
         presence.get(room.id)?.delete(u.id);
-        if (room.hostId === u.id)
+        if (room.hostId === u.id) {
           room.hostId = g.players.find((p) => !p.bot)?.id ?? u.id;
+          if (room.hostId !== u.id)
+            log(
+              g,
+              `Хост стола: ${g.players.find((p) => p.id === room.hostId)!.name}`,
+            );
+        }
         break;
       }
       case "settings":
@@ -562,10 +574,6 @@ export function createApp(path: string, options: { now?: () => number } = {}) {
       let changed = false;
       if (room.emptySince !== null) {
         room.emptySince = null;
-        changed = true;
-      }
-      if (!online.includes(room.hostId)) {
-        room.hostId = online[0];
         changed = true;
       }
       if (step(room.game, now())) changed = true;

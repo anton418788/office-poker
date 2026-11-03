@@ -352,7 +352,7 @@ test("Пустующий стол с ботами удаляется ровно 
     await s.close();
   }
 });
-test("Присутствие человека останавливает удаление, отключившийся хост передаёт права", async () => {
+test("Присутствие человека останавливает удаление, отключение хоста не выдаёт права игроку", async () => {
   let time = 1_800_000_000_000;
   const s = await open(":memory:", () => time);
   try {
@@ -367,10 +367,10 @@ test("Присутствие человека останавливает уда�
     s.instance.maintenance();
     assert.equal(
       (await s.call(b.cookie, `rooms/${id}`)).data.room.room.hostId,
-      b.user.id,
+      a.user.id,
     );
     assert.equal(
-      (await s.call(a.cookie, `rooms/${id}/bot`, { seat: 2 })).status,
+      (await s.call(b.cookie, `rooms/${id}/bot`, { seat: 2 })).status,
       403,
     );
     time += PRESENCE_MS + 1;
@@ -524,6 +524,63 @@ test("Лимит неудачных попыток входа", async () => {
       (await s.call("", "login", { login: "admin", password })).status,
       429,
     );
+  } finally {
+    await s.close();
+  }
+});
+
+test("Любое меню сохраняет активный стол, приватность, присутствие и права хоста", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      other = await s.add(admin, "other");
+    const room = await s.create(admin),
+      id = room.room.id;
+    await s.call(other.cookie, `rooms/${id}/join`, {});
+    for (let i = 0; i < 8; i++) {
+      time += PRESENCE_MS - 1;
+      // This is the same background poll used in Accounts and the lobby.
+      const menu = (await s.call(admin, "state")).data;
+      assert.equal(menu.activeRoom.room.id, id);
+      assert.equal(menu.activeRoom.room.hostId, room.me);
+      assert.equal(menu.activeRoom.canManage, true);
+      assert.equal("deck" in menu.activeRoom, false);
+      await s.call(other.cookie, "state");
+      s.instance.maintenance();
+      assert.equal(menu.rooms[0].emptySince, null);
+    }
+    for (const command of ["start", "bot", "pause", "settings", "remove"]) {
+      assert.equal(
+        (
+          await s.call(other.cookie, `rooms/${id}/${command}`, {
+            seat: 2,
+            ...rules,
+          })
+        ).status,
+        403,
+      );
+    }
+    assert.equal((await s.call(admin, `rooms/${id}`)).data.room.hand, 0);
+    const started = (await s.call(admin, `rooms/${id}/start`, {})).data.room;
+    const menu = (await s.call(admin, "state")).data;
+    assert.equal(menu.activeRoom.hand, started.hand);
+    assert.equal(
+      menu.activeRoom.players.find((p: any) => p.id === other.user.id).cards
+        .length,
+      0,
+    );
+    const otherMenu = (await s.call(other.cookie, "state")).data;
+    assert.equal(otherMenu.activeRoom.canManage, false);
+    assert.equal(
+      otherMenu.activeRoom.players.find((p: any) => p.id === room.me).cards
+        .length,
+      0,
+    );
+    time = started.deal.endsAt + 1;
+    await s.call(admin, `rooms/${id}/action`, { kind: "fold" });
+    await s.call(admin, `rooms/${id}/leave`, {});
+    assert.equal((await s.call(admin, "state")).data.activeRoom, undefined);
   } finally {
     await s.close();
   }

@@ -120,4 +120,5 @@ export type ClubState = {
   canSetup: boolean;
   rooms: RoomSummary[];
   room?: View;
+  activeRoom?: View;
 };

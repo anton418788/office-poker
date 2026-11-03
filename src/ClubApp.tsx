@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ClubState } from "../shared/types";
 import { GameScreen } from "./App";
 import { AccountsPanel } from "./AccountsPanel";
+import { useGameSounds } from "./useGameSounds";
+import { useDealPresentation } from "./useDealPresentation";
+import { ReturnToTable } from "./ReturnToTable";
 import { useTheme } from "./useTheme";
 import "./club.css";
 const format = (n: number) => n.toLocaleString("ru-RU");
@@ -30,6 +33,9 @@ export default function ClubApp() {
   const version = useRef(0),
     pending = useRef(false);
   const theme = useTheme();
+  const listeningGame = snapshot?.activeRoom ?? snapshot?.room ?? null;
+  const sound = useGameSounds(listeningGame);
+  useDealPresentation(listeningGame, sound.play);
   async function request(path: string, body?: object) {
     const res = await fetch(
       `/api/${path}`,
@@ -81,7 +87,13 @@ export default function ClubApp() {
             if (err.status === 401)
               setSnapshot((current) =>
                 current
-                  ? { ...current, account: null, rooms: [], room: undefined }
+                  ? {
+                      ...current,
+                      account: null,
+                      rooms: [],
+                      room: undefined,
+                      activeRoom: undefined,
+                    }
                   : current,
               );
           }
@@ -92,12 +104,15 @@ export default function ClubApp() {
       }
     };
     void load();
-    const poll = setInterval(load, selected ? 400 : 3000);
+    const poll = setInterval(
+      load,
+      selected || snapshot?.activeRoom ? 400 : 3000,
+    );
     return () => {
       alive = false;
       clearInterval(poll);
     };
-  }, [selected, snapshot?.account?.id]);
+  }, [selected, snapshot?.account?.id, snapshot?.activeRoom?.room?.id]);
   async function perform(path: string, body: object = {}) {
     if (pending.current) return;
     pending.current = true;
@@ -233,6 +248,18 @@ export default function ClubApp() {
         </section>
       </div>
     );
+  const active = snapshot.activeRoom;
+  const showReturn =
+    !!active && (selected !== active.room?.id || page === "accounts");
+  const returnButton = showReturn ? (
+    <ReturnToTable
+      game={active!}
+      onReturn={() => {
+        choose(active!.room!.id);
+        setPage("lobby");
+      }}
+    />
+  ) : null;
   if (
     selected &&
     snapshot.room &&
@@ -240,30 +267,35 @@ export default function ClubApp() {
     page !== "accounts"
   )
     return (
-      <GameScreen
-        key={selected}
-        design={theme}
-        g={snapshot.room}
-        account={account}
-        send={async (cmd, body) => {
-          await perform(`rooms/${selected}/${cmd}`, body);
-        }}
-        busy={busy}
-        error={error}
-        onLobby={() => {
-          choose(null);
-          setPage("lobby");
-        }}
-        onAccounts={() => {
-          choose(null);
-          setPage("accounts");
-        }}
-        onLogout={() => void perform("logout")}
-      />
+      <div className={showReturn ? "with-table-return" : undefined}>
+        {returnButton}
+        <GameScreen
+          key={selected}
+          design={theme}
+          sound={sound}
+          g={snapshot.room}
+          account={account}
+          send={async (cmd, body) => {
+            await perform(`rooms/${selected}/${cmd}`, body);
+          }}
+          busy={busy}
+          error={error}
+          onLobby={() => {
+            choose(null);
+            setPage("lobby");
+          }}
+          onAccounts={() => {
+            choose(null);
+            setPage("accounts");
+          }}
+          onLogout={() => void perform("logout")}
+        />
+      </div>
     );
   const seated = snapshot.rooms.find((r) => r.seated);
   return (
-    <div className="club-shell">
+    <div className={`club-shell ${showReturn ? "with-table-return" : ""}`}>
+      {returnButton}
       <header className="club-header">
         <button
           className="club-wordmark"
@@ -281,6 +313,15 @@ export default function ClubApp() {
             aria-label="Переключить тему"
           >
             {theme.theme === "club" ? "☀" : "♣"}
+          </button>
+          <button
+            className="sound-toggle"
+            onClick={sound.toggle}
+            aria-label={sound.enabled ? "Выключить звуки" : "Включить звуки"}
+            aria-pressed={sound.enabled}
+          >
+            {sound.enabled ? "♫" : "♪"}
+            <span>{sound.enabled ? "Звук вкл." : "Без звука"}</span>
           </button>
           <span>{account.name}</span>
           <strong>◉ {format(account.balance)}</strong>
@@ -305,7 +346,7 @@ export default function ClubApp() {
             request={request}
             onBack={() => setPage("lobby")}
             onChanged={() =>
-              void request("state")
+              void request(selected ? `rooms/${selected}` : "state")
                 .then(setSnapshot)
                 .catch(() => setError("Нет связи с сервером"))
             }

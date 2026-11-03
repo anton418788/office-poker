@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Account, View } from "../shared/types";
 import "./style.css";
 import "./themes.css";
-import { useGameSounds } from "./useGameSounds";
+import type { useGameSounds } from "./useGameSounds";
 import { Card } from "./Card";
 import { WinnerCrown } from "./WinnerCrown";
 import { crownWinners } from "../shared/winners";
@@ -11,6 +11,7 @@ import { TableSidebar } from "./TableSidebar";
 import { useDealPresentation } from "./useDealPresentation";
 import { useTheme } from "./useTheme";
 import { RoomControls } from "./RoomControls";
+const silent = () => {};
 const format = (n: number) => n.toLocaleString("ru-RU");
 export function GameScreen({
   g,
@@ -22,6 +23,7 @@ export function GameScreen({
   onAccounts,
   onLogout,
   design,
+  sound,
 }: {
   g: View;
   account: Account;
@@ -32,6 +34,7 @@ export function GameScreen({
   onAccounts: () => void;
   onLogout: () => void;
   design: ReturnType<typeof useTheme>;
+  sound: ReturnType<typeof useGameSounds>;
 }) {
   const [raise, setRaise] = useState(40),
     [now, setNow] = useState(Date.now());
@@ -43,8 +46,7 @@ export function GameScreen({
       return false;
     }
   });
-  const sound = useGameSounds(g);
-  const presentation = useDealPresentation(g, sound.play);
+  const presentation = useDealPresentation(g, silent);
   function toggleMenu() {
     setMenuHidden((hidden) => {
       try {

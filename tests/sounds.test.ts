@@ -72,3 +72,24 @@ test("Несколько чеков между обновлениями не т�
     2,
   );
 });
+
+test("Переход между меню не теряет звук хода и не повторяет уже прозвучавшие события", () => {
+  const g = setup();
+  start(g);
+  const before = view(g, "b", false);
+  before.room = { id: "table", name: "Стол", hostId: "a", hostName: "Анна" };
+  action(g, "a", "call");
+  const inAccounts = view(g, "b", false);
+  inAccounts.room = before.room;
+  assert.deepEqual(soundEvents(before, inAccounts), ["chips", "turn"]);
+  assert.deepEqual(soundEvents(inAccounts, structuredClone(inAccounts)), []);
+  const other = structuredClone(inAccounts);
+  other.room = { ...inAccounts.room, id: "other" };
+  other.transferSeq = 999;
+  other.checkSeq = 999;
+  other.checks = [{ id: 999, hand: 1, seat: 1 }];
+  assert.deepEqual(soundEvents(inAccounts, other), []);
+  const anotherAccount = structuredClone(inAccounts);
+  anotherAccount.me = "a";
+  assert.deepEqual(soundEvents(inAccounts, anotherAccount), []);
+});

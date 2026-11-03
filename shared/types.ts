@@ -1,5 +1,6 @@
 import type { CaseOpening } from "./cases";
 import type { Appearance, Inventory } from "./cosmetics";
+import type { HandCombination, PlayerProfile, ProfileGift } from "./profile";
 export type Card = { rank: number; suit: "s" | "h" | "d" | "c" };
 export type Player = {
   id: string;
@@ -51,12 +52,18 @@ export type HandWinner = {
   holeIndexes: number[];
 };
 export type HandResult = {
+  statistics?: {
+    id: string;
+    combination: HandCombination | null;
+    won: boolean;
+  }[];
   hand: number;
   byFold: boolean;
   winners: HandWinner[];
   previousWinnerIds: string[];
 };
 export type Game = {
+  handParticipants?: string[];
   departedBets?: { id: string; seat: number; bet: number; total: number }[];
   cardBack?: string;
   lastResult?: HandResult;
@@ -128,4 +135,6 @@ export type ClubState = {
   activeRoom?: View;
   inventory?: Inventory;
   caseOpening?: CaseOpening;
+  profile?: PlayerProfile;
+  giftOpening?: ProfileGift;
 };

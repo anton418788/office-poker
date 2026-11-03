@@ -31,6 +31,7 @@ import {
 } from "./engine.js";
 import { addBot, step } from "./bots.js";
 import { isDealing } from "../shared/dealing.js";
+import { createProfiles } from "./profiles.js";
 import {
   chipsAmount,
   displayName,
@@ -209,6 +210,10 @@ export function createApp(
       equipped.accessory = null;
     return { owned, equipped };
   };
+  const profiles = createProfiles(db, (id) => {
+    const account = user(id);
+    return account ? inventoryFor(account).owned : null;
+  });
   // Older rooms acquire the same account appearance without changing the hand's deck.
   for (const room of rooms.values())
     for (const p of room.game.players) {
@@ -235,10 +240,6 @@ export function createApp(
       .map((p) => p.id);
   const saveRoom = (room: Room, withdrawn?: { id: string; chips: number }) => {
     transaction(() => {
-      db.prepare("INSERT OR REPLACE INTO rooms VALUES(?,?)").run(
-        room.id,
-        JSON.stringify(room),
-      );
       if (withdrawn)
         db.prepare("UPDATE users SET balance=? WHERE id=?").run(
           withdrawn.chips,
@@ -246,6 +247,11 @@ export function createApp(
         );
       for (const p of room.game.players.filter((p) => !p.bot))
         db.prepare("UPDATE users SET balance=? WHERE id=?").run(p.chips, p.id);
+      profiles.record(room.id, room.game, now());
+      db.prepare("INSERT OR REPLACE INTO rooms VALUES(?,?)").run(
+        room.id,
+        JSON.stringify(room),
+      );
     });
     rooms.set(room.id, room);
   };
@@ -340,6 +346,7 @@ export function createApp(
       canSetup: !initialized() && res.locals.local,
       rooms: u ? summaries(u.id) : [],
       ...(u ? { inventory: inventoryFor(u) } : {}),
+      ...(u ? { profile: profiles.profile(u.id) } : {}),
       ...(room && u ? { room: roomView(room, u) } : {}),
       ...(active && u
         ? {
@@ -483,6 +490,37 @@ export function createApp(
     });
     if (next) rooms.set(next.id, next);
     res.json(state(res));
+  });
+  app.post("/api/profile/gifts/:id/open", requireUser, (req, res) => {
+    const u: UserRow = res.locals.account;
+    const giftId = String(req.params.id);
+    const current = profiles.profile(u.id);
+    const pendingGift = current.gifts.some((g) => g.id === giftId);
+    const active = occupied(u.id);
+    if (
+      pendingGift &&
+      active &&
+      (running(active.game) || isDealing(active.game, now()))
+    )
+      fail(
+        "Открыть подарок можно между раздачами. Ваше место за столом сохранено.",
+      );
+    const next = active ? structuredClone(active) : null;
+    let opening;
+    transaction(() => {
+      opening = profiles.open(u.id, giftId, now());
+      if (next) {
+        next.game.players.find((p) => p.id === u.id)!.chips = user(
+          u.id,
+        )!.balance;
+        db.prepare("UPDATE rooms SET json=? WHERE id=?").run(
+          JSON.stringify(next),
+          next.id,
+        );
+      }
+    });
+    if (next) rooms.set(next.id, next);
+    res.json({ ...state(res), giftOpening: opening });
   });
   app.get("/api/shop/openings", requireUser, (_req, res) => {
     const rows = db

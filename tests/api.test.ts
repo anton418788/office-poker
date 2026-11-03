@@ -8,8 +8,176 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { tokenHash } from "../server/accounts.js";
+import { cosmeticItems } from "../shared/cosmetics.js";
 const password = "test-password-123";
 const rules = { small: 10, big: 20, minutes: 10, step: 10 };
+test("Профиль через API: завершение раздачи, сохранение, запрет чужого подарка и идемпотентное открытие", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-profile-api-")),
+    path = pathJoin(dir, "game.sqlite");
+  let now = Date.now(),
+    s = await open(path, () => now);
+  try {
+    const admin = await s.setup(),
+      regular = await s.add(admin, "profile_user");
+    const room = await s.create(regular.cookie);
+    await s.close();
+    const db = new DatabaseSync(path);
+    const row = db
+      .prepare("SELECT json FROM rooms WHERE id=?")
+      .get(room.room.id) as { json: string };
+    const saved = JSON.parse(row.json),
+      g = createGame();
+    join(g, regular.user.id, "profile_user", 0);
+    join(g, "profile-test-bot", "Бот", 1);
+    g.players[1].bot = true;
+    // River fixture; the final real API check must settle, persist and award atomically.
+    g.hand = 1;
+    g.handParticipants = [regular.user.id];
+    g.phase = "river";
+    g.actor = regular.user.id;
+    g.acted = ["profile-test-bot"];
+    g.currentBet = 0;
+    g.deadline = now + 600000;
+    g.board = [
+      { rank: 7, suit: "d" },
+      { rank: 6, suit: "c" },
+      { rank: 5, suit: "s" },
+      { rank: 2, suit: "h" },
+      { rank: 13, suit: "d" },
+    ];
+    g.players[0].cards = [
+      { rank: 9, suit: "s" },
+      { rank: 8, suit: "h" },
+    ];
+    g.players[1].cards = [
+      { rank: 14, suit: "c" },
+      { rank: 12, suit: "d" },
+    ];
+    for (const p of g.players) {
+      p.chips = 1980;
+      p.total = 20;
+      p.bet = 0;
+    }
+    saved.game = g;
+    db.prepare("UPDATE rooms SET json=? WHERE id=?").run(
+      JSON.stringify(saved),
+      saved.id,
+    );
+    db.prepare("UPDATE users SET balance=1980 WHERE id=?").run(regular.user.id);
+    db.close();
+    s = await open(path, () => now);
+    const ended = await s.call(regular.cookie, `rooms/${saved.id}/action`, {
+      kind: "check",
+    });
+    assert.equal(ended.status, 200);
+    assert.equal(ended.data.room.phase, "showdown");
+    assert.equal(ended.data.profile.hands, 1);
+    assert.equal(ended.data.profile.wins, 1);
+    assert.equal(ended.data.profile.combinations.straight, 1);
+    const gift = ended.data.profile.gifts[0];
+    assert.equal(gift.rarity, "rare");
+    assert.equal(ended.data.account.balance, 2020);
+    for (let i = 0; i < 3; i++)
+      assert.equal(
+        (await s.call(regular.cookie, `rooms/${saved.id}`)).data.profile.hands,
+        1,
+      );
+    await s.close();
+    s = await open(path, () => now);
+    assert.equal(
+      (await s.call(regular.cookie, "state")).data.profile.gifts[0].id,
+      gift.id,
+    );
+    assert.equal(
+      (await s.call("", `profile/gifts/${gift.id}/open`, {})).status,
+      401,
+    );
+    assert.equal(
+      (await s.call(admin, `profile/gifts/${gift.id}/open`, {})).status,
+      404,
+    );
+    await s.call(regular.cookie, `rooms/${saved.id}/start`, {});
+    assert.equal(
+      (await s.call(regular.cookie, `profile/gifts/${gift.id}/open`, {}))
+        .status,
+      400,
+    );
+    assert.equal(
+      (await s.call(regular.cookie, "state")).data.profile.gifts.length,
+      1,
+    );
+    now += 30000;
+    await s.call(regular.cookie, `rooms/${saved.id}/leave`, {});
+    const before = (await s.call(regular.cookie, "state")).data.account.balance;
+    const results = await Promise.all([
+      s.call(regular.cookie, `profile/gifts/${gift.id}/open`, {}),
+      s.call(regular.cookie, `profile/gifts/${gift.id}/open`, {}),
+    ]);
+    for (const r of results) {
+      assert.equal(r.status, 200);
+      assert.equal(r.data.profile.gifts.length, 0);
+      assert.equal(r.data.inventory.owned.length, 3);
+      assert.equal(r.data.account.balance, before);
+      assert.equal(r.data.giftOpening.compensation, 0);
+    }
+    assert.equal(
+      results[0].data.giftOpening.itemId,
+      results[1].data.giftOpening.itemId,
+    );
+    await s.close();
+    s = await open(path, () => now);
+    const persisted = (await s.call(regular.cookie, "state")).data;
+    assert.equal(persisted.profile.hands, 2);
+    assert.equal(persisted.profile.combinations.straight, 1);
+    assert.equal(persisted.profile.gifts.length, 0);
+    assert.equal(persisted.inventory.owned.length, 3);
+    // Full rare accessory collection: the reward must also reach the room stack,
+    // remain on the account after restart, and never be minted twice.
+    await s.close();
+    const fullDb = new DatabaseSync(path);
+    for (const item of cosmeticItems.filter(
+      (item) => item.slot === "accessory" && item.rarity === "rare",
+    ))
+      fullDb
+        .prepare("INSERT OR IGNORE INTO user_items VALUES(?,?)")
+        .run(regular.user.id, item.id);
+    g.hand = 3;
+    g.deadline = now + 600000;
+    saved.game = g;
+    fullDb
+      .prepare("UPDATE rooms SET json=? WHERE id=?")
+      .run(JSON.stringify(saved), saved.id);
+    fullDb
+      .prepare("UPDATE users SET balance=1980 WHERE id=?")
+      .run(regular.user.id);
+    fullDb.close();
+    s = await open(path, () => now);
+    const compensated = await s.call(
+      regular.cookie,
+      `rooms/${saved.id}/action`,
+      { kind: "check" },
+    );
+    assert.equal(compensated.status, 200);
+    assert.equal(compensated.data.account.balance, 2520);
+    assert.equal(
+      compensated.data.room.players.find((p: any) => p.id === regular.user.id)
+        .chips,
+      2520,
+    );
+    assert.equal(compensated.data.profile.gifts.length, 0);
+    assert.equal(compensated.data.profile.recentRewards[0].compensation, 500);
+    await s.call(regular.cookie, `rooms/${saved.id}/pause`, {});
+    await s.close();
+    s = await open(path, () => now);
+    const final = (await s.call(regular.cookie, `rooms/${saved.id}`)).data;
+    assert.equal(final.account.balance, 2520);
+    assert.equal(final.profile.hands, 3);
+    assert.equal(final.profile.combinations.straight, 2);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
 test("Аксессуар: миграция старого выбора, владение, отображение за столом, снятие и перезапуск", async () => {
   const dir = mkdtempSync(pathJoin(tmpdir(), "poker-accessory-")),
     path = pathJoin(dir, "game.sqlite");

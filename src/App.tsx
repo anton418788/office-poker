@@ -5,13 +5,13 @@ import "./style.css";
 import "./themes.css";
 import type { useGameSounds } from "./useGameSounds";
 import { Card } from "./Card";
-import { WinnerCrown } from "./WinnerCrown";
 import { crownWinners } from "../shared/winners";
 import { PokerTable } from "./PokerTable";
 import { TableSidebar } from "./TableSidebar";
 import { useDealPresentation } from "./useDealPresentation";
 import { useTheme } from "./useTheme";
 import { RoomControls } from "./RoomControls";
+import { ProfileButton } from "./ProfileButton";
 const silent = () => {};
 const format = (n: number) => n.toLocaleString("ru-RU");
 export function GameScreen({
@@ -24,6 +24,8 @@ export function GameScreen({
   onAccounts,
   onInventory,
   onShop,
+  onProfile,
+  giftCount,
   onLogout,
   design,
   sound,
@@ -37,6 +39,8 @@ export function GameScreen({
   onAccounts: () => void;
   onInventory: () => void;
   onShop: () => void;
+  onProfile: () => void;
+  giftCount: number;
   onLogout: () => void;
   design: ReturnType<typeof useTheme>;
   sound: ReturnType<typeof useGameSounds>;
@@ -143,6 +147,9 @@ export function GameScreen({
         <button className="nav" onClick={onInventory}>
           ♧ <span>Инвентарь</span>
         </button>
+        <button className="nav" onClick={onProfile}>
+          ♙ <span>Мой профиль{giftCount > 0 ? ` · ${giftCount}` : ""}</span>
+        </button>
         <button className="nav" onClick={onShop}>
           ▣ <span>Магазин</span>
         </button>
@@ -216,10 +223,12 @@ export function GameScreen({
               {sound.enabled ? "♫" : "♪"}
               <span>{sound.enabled ? "Звук вкл." : "Без звука"}</span>
             </button>
-            <span className="avatar tiny">
-              {me?.name.slice(0, 1).toUpperCase() ?? "?"}
-              {crowns.includes(g.me) && <WinnerCrown />}
-            </span>
+            <ProfileButton
+              name={account.name}
+              count={giftCount}
+              onClick={onProfile}
+              winner={crowns.includes(g.me)}
+            />
             {account.name}{" "}
             <span className="account-balance">◉ {format(account.balance)}</span>{" "}
             <button

@@ -1,4 +1,5 @@
 import { normalizeAppearance } from "../shared/cosmetics.js";
+import { combinationFromScore } from "../shared/profile.js";
 import type { Game, Player, View } from "../shared/types.js";
 import { deck, evaluate, compare, combinations } from "./poker.js";
 import { bestFive } from "../shared/poker.js";
@@ -144,6 +145,7 @@ export function start(g: Game, now = Date.now(), animate = false) {
   g.board = [];
   g.result = [];
   g.hand++;
+  g.handParticipants = players.filter((p) => !p.bot).map((p) => p.id);
   g.phase = "preflop";
   g.acted = [];
   g.currentBet = g.settings.big;
@@ -235,6 +237,24 @@ export function settle(g: Game) {
   }
   const byFold = candidates.length === 1;
   g.lastResult = {
+    statistics: (
+      g.handParticipants ??
+      g.players.filter((p) => !p.bot && p.cards.length === 2).map((p) => p.id)
+    ).map((id) => {
+      const p = g.players.find((p) => p.id === id);
+      return {
+        id,
+        won: winningIds.has(id),
+        combination:
+          !byFold &&
+          p &&
+          !p.folded &&
+          p.cards.length === 2 &&
+          g.board.length === 5
+            ? combinationFromScore(evaluate([...p.cards, ...g.board]))
+            : null,
+      };
+    }),
     hand: g.hand,
     byFold,
     previousWinnerIds: g.lastResult?.winners.map((w) => w.id) ?? [],

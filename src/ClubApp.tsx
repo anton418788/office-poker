@@ -7,10 +7,13 @@ import { AccountsPanel } from "./AccountsPanel";
 import { useGameSounds } from "./useGameSounds";
 import { useDealPresentation } from "./useDealPresentation";
 import { ReturnToTable } from "./ReturnToTable";
+import { ProfileButton } from "./ProfileButton";
+import { ProfilePanel } from "./ProfilePanel";
 import { useTheme } from "./useTheme";
 import "./club.css";
 import "./cosmetics.css";
 import "./shop.css";
+import "./profile.css";
 const format = (n: number) => n.toLocaleString("ru-RU");
 const phaseNames = {
   waiting: "Ожидает игроков",
@@ -36,6 +39,29 @@ export default function ClubApp() {
     [creating, setCreating] = useState(false);
   const version = useRef(0),
     pending = useRef(false);
+  const [giftNotice, setGiftNotice] = useState(false);
+  const giftSeen = useRef<{ user: string; sequence: number } | null>(null);
+  const profile = snapshot?.profile;
+  const userId = snapshot?.account?.id;
+  useEffect(() => {
+    if (!userId || !profile) {
+      giftSeen.current = null;
+      setGiftNotice(false);
+      return;
+    }
+    if (
+      giftSeen.current?.user === userId &&
+      profile.giftSequence > giftSeen.current.sequence &&
+      profile.gifts.length > 0
+    )
+      setGiftNotice(true);
+    giftSeen.current = { user: userId, sequence: profile.giftSequence };
+  }, [userId, profile?.giftSequence]);
+  useEffect(() => {
+    if (!giftNotice) return;
+    const timer = setTimeout(() => setGiftNotice(false), 6500);
+    return () => clearTimeout(timer);
+  }, [giftNotice, profile?.giftSequence]);
   const theme = useTheme();
   const listeningGame = snapshot?.activeRoom ?? snapshot?.room ?? null;
   const sound = useGameSounds(listeningGame);
@@ -253,6 +279,25 @@ export default function ClubApp() {
       </div>
     );
   const active = snapshot.activeRoom;
+  const openProfile = () => {
+    choose(null);
+    setPage("profile");
+    setGiftNotice(false);
+  };
+  const giftCount = profile?.gifts.length ?? 0;
+  const giftToast =
+    giftNotice && giftCount > 0 && page !== "profile" ? (
+      <aside className="gift-toast" role="status">
+        <p>В вашем профиле новый подарок</p>
+        <button onClick={openProfile}>Открыть профиль ↗</button>
+        <button
+          aria-label="Скрыть уведомление о подарке"
+          onClick={() => setGiftNotice(false)}
+        >
+          ×
+        </button>
+      </aside>
+    ) : null;
   const showReturn =
     !!active && (selected !== active.room?.id || page !== "lobby");
   const returnButton = showReturn ? (
@@ -273,12 +318,15 @@ export default function ClubApp() {
     return (
       <div className={showReturn ? "with-table-return" : undefined}>
         {returnButton}
+        {giftToast}
         <GameScreen
           key={selected}
           design={theme}
           sound={sound}
           g={snapshot.room}
           account={account}
+          onProfile={openProfile}
+          giftCount={giftCount}
           send={async (cmd, body) => {
             await perform(`rooms/${selected}/${cmd}`, body);
           }}
@@ -308,6 +356,7 @@ export default function ClubApp() {
   return (
     <div className={`club-shell ${showReturn ? "with-table-return" : ""}`}>
       {returnButton}
+      {giftToast}
       <header className="club-header">
         <button
           className="club-wordmark"
@@ -335,7 +384,11 @@ export default function ClubApp() {
             {sound.enabled ? "♫" : "♪"}
             <span>{sound.enabled ? "Звук вкл." : "Без звука"}</span>
           </button>
-          <span>{account.name}</span>
+          <ProfileButton
+            name={account.name}
+            count={giftCount}
+            onClick={openProfile}
+          />
           <strong>◉ {format(account.balance)}</strong>
           <button
             onClick={() => {
@@ -369,7 +422,21 @@ export default function ClubApp() {
         </div>
       </header>
       <main className="club-main">
-        {page === "shop" ? (
+        {page === "profile" && profile ? (
+          <ProfilePanel
+            key={account.id}
+            account={account}
+            profile={profile}
+            activeRoom={active}
+            busy={busy}
+            error={error}
+            onBack={() => setPage("lobby")}
+            onInventory={() => setPage("inventory")}
+            onOpen={async (id) =>
+              (await perform(`profile/gifts/${id}/open`))?.giftOpening ?? null
+            }
+          />
+        ) : page === "shop" ? (
           <ShopPanel
             key={account.id}
             account={account}

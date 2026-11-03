@@ -47,6 +47,7 @@ export function PokerTable({
     pausedAt = useRef<number | null>(null);
   const inHand =
     !["waiting", "showdown"].includes(g.phase) || presentation.active;
+  const canSit = !g.players.some((p) => p.id === g.me);
   const sceneRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(() => window.innerWidth <= 680);
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
@@ -352,7 +353,17 @@ export function PokerTable({
                 <div className="empty-seat">
                   <span className="seat-number">{seat + 1}</span>
                   <span>Свободно</span>
-                  {g.canManage && !inHand && (
+                  {canSit && (
+                    <button
+                      className="seat-bot seat-join"
+                      disabled={busy}
+                      aria-label={`Сесть за стол на место ${seat + 1}`}
+                      onClick={() => send("join", { seat })}
+                    >
+                      Сесть за стол
+                    </button>
+                  )}
+                  {g.canManage && !inHand && !canSit && (
                     <button
                       className="seat-bot"
                       disabled={busy}

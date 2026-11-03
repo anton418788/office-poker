@@ -277,27 +277,15 @@ export function GameScreen({
             <div className="result">✦ {g.result.join(" · ")}</div>
           )}
           {!me ? (
-            <form
-              className="join-bar"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send("join");
-              }}
-            >
+            <section className="join-bar" aria-label="Выбор места за столом">
               <div>
-                <h3>Ваше место за столом</h3>
+                <h3>Выберите свободное место</h3>
                 <p>
-                  Ваш баланс — {format(account.balance)} фишек. Он сохранится
-                  после выхода.
+                  Нажмите «Сесть за стол» на нужном кресле. Ваш баланс —{" "}
+                  {format(account.balance)} фишек.
                 </p>
               </div>
-              <button
-                className="primary"
-                disabled={busy || g.players.length >= 6}
-              >
-                Занять место ↗
-              </button>
-            </form>
+            </section>
           ) : (
             <section
               className={`action-bar ${myTurn ? "your-turn" : ""}`}

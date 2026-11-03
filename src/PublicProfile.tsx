@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PublicPlayerProfile } from "../shared/profile";
 import { profileCombinations } from "../shared/profile";
 import { ProfileOverview, CombinationTable } from "./ProfileOverview";
@@ -84,8 +84,85 @@ export function MiniProfile({
   const { data, error } = usePublicProfile(id, request);
   const root = useRef<HTMLElement>(null),
     close = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const trigger = document.getElementById(`player-profile-${id}`);
+    const anchor = trigger?.closest<HTMLElement>(".player");
+    const popup = root.current;
+    if (!anchor || !popup) {
+      onClose();
+      return;
+    }
+    const update = () => {
+      if (!anchor.isConnected) {
+        onClose();
+        return;
+      }
+      const card = anchor.getBoundingClientRect(),
+        box = popup.getBoundingClientRect();
+      const padding = 12,
+        gap = 10,
+        width = window.innerWidth,
+        height = window.innerHeight;
+      if (
+        card.bottom < padding ||
+        card.top > height - padding ||
+        card.right < padding ||
+        card.left > width - padding
+      ) {
+        onClose();
+        return;
+      }
+      const clamp = (value: number, max: number) =>
+        Math.max(padding, Math.min(value, max - padding));
+      let left = clamp(
+        card.left + (card.width - box.width) / 2,
+        width - box.width,
+      );
+      let top: number;
+      if (card.bottom + gap + box.height <= height - padding)
+        top = card.bottom + gap;
+      else if (card.top - gap - box.height >= padding)
+        top = card.top - gap - box.height;
+      else if (card.right + gap + box.width <= width - padding) {
+        left = card.right + gap;
+        top = clamp(
+          card.top + (card.height - box.height) / 2,
+          height - box.height,
+        );
+      } else if (card.left - gap - box.width >= padding) {
+        left = card.left - gap - box.width;
+        top = clamp(
+          card.top + (card.height - box.height) / 2,
+          height - box.height,
+        );
+      } else top = clamp(card.bottom + gap, height - box.height);
+      const next = { left: Math.round(left), top: Math.round(top) };
+      setPosition((previous) =>
+        previous?.left === next.left && previous.top === next.top
+          ? previous
+          : next,
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(popup);
+    observer.observe(anchor);
+    const scene = anchor.closest(".table-scene");
+    if (scene) observer.observe(scene);
+    window.addEventListener("resize", update);
+    document.addEventListener("scroll", update, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      document.removeEventListener("scroll", update, true);
+    };
+  }, [id]);
   useEffect(() => {
-    close.current?.focus();
+    close.current?.focus({ preventScroll: true });
     const outside = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) onClose();
     };
@@ -93,7 +170,9 @@ export function MiniProfile({
       if (event.key === "Escape") {
         event.stopPropagation();
         onClose();
-        document.getElementById(`player-profile-${id}`)?.focus();
+        document
+          .getElementById(`player-profile-${id}`)
+          ?.focus({ preventScroll: true });
       }
     };
     document.addEventListener("pointerdown", outside);
@@ -109,6 +188,11 @@ export function MiniProfile({
   return (
     <aside
       ref={root}
+      style={{
+        left: position?.left ?? 0,
+        top: position?.top ?? 0,
+        visibility: position ? "visible" : "hidden",
+      }}
       className="mini-profile club-panel"
       role="dialog"
       aria-modal="false"

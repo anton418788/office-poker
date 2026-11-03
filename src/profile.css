@@ -572,12 +572,10 @@
 }
 .mini-profile {
   position: fixed;
-  right: 24px;
-  top: 96px;
   z-index: 90;
   width: 330px;
   max-width: calc(100vw - 24px);
-  max-height: calc(100dvh - 115px);
+  max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: 24px;
   box-shadow: 0 12px 40px #0004;
@@ -645,10 +643,4 @@
 .mini-profile > .primary {
   width: 100%;
   font-size: 12px;
-}
-@media (max-width: 760px) {
-  .mini-profile {
-    top: 82px;
-    right: 12px;
-  }
 }

@@ -7,6 +7,11 @@ export type Player = {
   chips: number;
   cards: Card[];
   folded: boolean;
+  lastAction?: {
+    kind: "fold" | "check" | "call" | "raise";
+    amount?: number;
+    hand: number;
+  };
   bet: number;
   total: number;
 };
@@ -69,12 +74,50 @@ export type Game = {
   paused: boolean;
   remaining: number;
   hand: number;
-  settings: { small: number; big: number; stack: number; minutes: number };
+  settings: {
+    small: number;
+    big: number;
+    stack: number;
+    minutes: number;
+    step?: number;
+  };
   log: string[];
   result: string[];
 };
 export type View = Omit<Game, "deck"> & {
+  room?: { id: string; name: string; hostId: string; hostName: string };
+  canManage?: boolean;
   me: string;
   admin: boolean;
   legal: { call: number; min: number; max: number; canRaise: boolean };
+};
+
+export type Account = {
+  id: string;
+  login: string | null;
+  name: string;
+  balance: number;
+  admin: boolean;
+};
+export type RoomSummary = {
+  id: string;
+  name: string;
+  hostId: string;
+  hostName: string;
+  humans: number;
+  bots: number;
+  online: number;
+  phase: Game["phase"];
+  small: number;
+  big: number;
+  minutes: number;
+  emptySince: number | null;
+  seated: boolean;
+};
+export type ClubState = {
+  account: Account | null;
+  needsSetup: boolean;
+  canSetup: boolean;
+  rooms: RoomSummary[];
+  room?: View;
 };

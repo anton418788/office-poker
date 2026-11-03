@@ -20,6 +20,6 @@ const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 3002);
 app.listen(port, host, () =>
   console.log(
-    `После дейли: http://${host}:${port}\nПервый вход с localhost получает права администратора. Сохранение: ${path}`,
+    `После дейли: http://${host}:${port}\nПервого администратора создайте через форму на localhost. Сохранение: ${path}`,
   ),
 );

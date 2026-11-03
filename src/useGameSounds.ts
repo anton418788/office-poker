@@ -39,7 +39,10 @@ export function useGameSounds(game: View | null) {
     [],
   );
   useEffect(() => {
-    if (!game) return;
+    if (!game) {
+      previous.current = null;
+      return;
+    }
     let delay = 0;
     soundEvents(previous.current, game)
       .filter(

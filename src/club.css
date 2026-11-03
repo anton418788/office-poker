@@ -1,0 +1,442 @@
+.club-shell {
+  min-height: 100vh;
+  background: var(--club-bg, #f3f4ee);
+}
+.club-main {
+  max-width: 1440px;
+  margin: auto;
+  padding: 34px 44px 60px;
+  width: 100%;
+}
+.club-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 44px;
+  border-bottom: 1px solid var(--line);
+}
+.club-wordmark {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.club-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.club-profile strong,
+.account-balance {
+  color: #8c7040;
+  white-space: nowrap;
+}
+.compact-button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.club-panel,
+.room-card {
+  border: 1px solid var(--line);
+  background: #fffef8;
+  border-radius: 20px;
+  padding: 26px;
+}
+.club-panel h2,
+.room-card h2 {
+  margin: 0 0 16px;
+  font-family: Manrope, system-ui, sans-serif;
+}
+.club-form {
+  display: grid;
+  gap: 18px;
+}
+.club-form label,
+.room-rules label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.club-form input {
+  width: 100%;
+}
+.club-form p {
+  margin: 0;
+  font-size: 14px;
+}
+.create-room {
+  margin: 0 0 28px;
+}
+.create-room .club-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.room-name-field {
+  grid-column: 1/-1;
+}
+.club-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  background: #e9eedf;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.empty-club {
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 24px;
+  padding: 64px 24px;
+}
+.empty-club > span {
+  font-size: 72px;
+  color: #839a70;
+}
+.empty-club h2 {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 28px;
+  margin: 8px;
+}
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 24px;
+}
+.room-card-top,
+.room-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.room-card h2 {
+  font-size: 25px;
+  margin: 24px 0 6px;
+  overflow-wrap: anywhere;
+}
+.room-card p {
+  margin: 0 0 24px;
+  font-size: 14px;
+}
+.room-mini-table {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 46px;
+  border: 3px solid #8b8d59;
+  border-radius: 50%;
+  background: #24583b;
+  color: #e8d698;
+  font-size: 23px;
+  box-shadow: 0 4px 0 #1b3824;
+}
+.room-card dl {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 26px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.room-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.room-card dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 18px;
+}
+.room-card-bottom > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.room-card-bottom button {
+  font-size: 13px;
+  padding: 11px;
+}
+.club-footnote {
+  text-align: center;
+  font-size: 13px;
+  margin: 32px 0 0;
+}
+.accounts-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 28px;
+  align-items: start;
+}
+.account-list {
+  display: grid;
+  gap: 10px;
+}
+.account-row {
+  display: flex;
+  text-align: left;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: transparent;
+}
+.account-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+.account-row b {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.account-row.selected {
+  border-color: #8ca86b;
+  background: #eff3e7;
+}
+.room-controls {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  background: #fffef8;
+}
+.room-controls > summary {
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.room-controls > summary > span {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 12px;
+}
+.host-actions,
+.host-bots {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  align-items: center;
+}
+.host-actions > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.host-bots button {
+  font-size: 12px;
+  padding: 8px 12px;
+}
+.room-rules {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.room-rules summary {
+  cursor: pointer;
+}
+.room-rules form {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.room-rules input {
+  width: 130px;
+}
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  align-items: stretch;
+  background: var(--club-bg, #f3f4ee);
+}
+.auth-art {
+  padding: 52px 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 20% 35%, #285940, transparent 65%), #0e251b;
+  color: #edf2e7;
+}
+.auth-art .club-wordmark {
+  color: #e9dfad;
+}
+.auth-art .eyebrow {
+  color: #a7c5b0;
+}
+.auth-art h1 {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: clamp(38px, 4.8vw, 74px);
+  line-height: 1.12;
+  letter-spacing: -3px;
+  margin: 22px 0;
+}
+.auth-art p {
+  color: #aac2b1;
+  font-size: 17px;
+}
+.auth-art small {
+  color: #9ab3a1;
+  font-size: 12px;
+}
+.auth-suits {
+  display: block;
+  color: #d2bf7a;
+  font-size: 40px;
+  letter-spacing: 12px;
+  margin-top: 36px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 490px;
+  align-self: center;
+  justify-self: center;
+  padding: 40px;
+}
+.auth-card h2 {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 32px;
+  letter-spacing: -1px;
+  line-height: 1.15;
+}
+.auth-card > p {
+  margin-bottom: 30px;
+  font-size: 15px;
+}
+[data-theme="club"] {
+  --club-bg: #0a1912;
+}
+[data-theme="club"] .club-shell {
+  background:
+    radial-gradient(ellipse at 40% 0, #183a29, transparent 65%), #0a1912;
+}
+[data-theme="club"] .club-panel,
+[data-theme="club"] .room-card,
+[data-theme="club"] .room-controls {
+  background: #142c20;
+  border-color: #33523d;
+}
+[data-theme="club"] .club-notice {
+  background: #1b3929;
+  border-color: #3f6445;
+}
+[data-theme="club"] .account-row.selected {
+  background: #224531;
+  border-color: #648c5c;
+}
+[data-theme="club"] .club-profile strong,
+[data-theme="club"] .account-balance {
+  color: #e0c77f;
+}
+[data-theme="club"] .empty-club > span {
+  color: #8fad7c;
+}
+@media (max-width: 900px) {
+  .club-header {
+    padding: 20px;
+    align-items: flex-start;
+  }
+  .club-main {
+    padding: 24px 20px;
+  }
+  .club-profile {
+    justify-content: flex-end;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .club-profile button {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .accounts-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+  .auth-art {
+    padding: 40px 30px;
+  }
+  .auth-art h1 {
+    letter-spacing: -1px;
+  }
+  .auth-card {
+    padding: 28px;
+  }
+  .page-heading {
+    gap: 20px;
+  }
+}
+@media (max-width: 650px) {
+  .auth-page {
+    grid-template-columns: 1fr;
+  }
+  .auth-art {
+    min-height: auto;
+    padding: 28px;
+  }
+  .auth-art > div {
+    display: none;
+  }
+  .auth-art small {
+    display: none;
+  }
+  .auth-card {
+    padding: 32px 24px;
+  }
+  .accounts-layout {
+    grid-template-columns: 1fr;
+  }
+  .create-room .club-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .club-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .club-profile {
+    justify-content: flex-start;
+  }
+  .club-main .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .room-grid {
+    grid-template-columns: 1fr;
+  }
+  .club-panel,
+  .room-card {
+    padding: 20px;
+  }
+  .club-notice {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .host-actions button {
+    font-size: 13px;
+    padding: 10px;
+  }
+  .room-controls > summary > span {
+    display: block;
+    margin: 8px 0 0;
+  }
+  .room-rules form label {
+    flex: 1;
+  }
+  .room-rules input {
+    width: 100%;
+  }
+}

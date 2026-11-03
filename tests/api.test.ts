@@ -1,165 +1,530 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp } from "../server/app.js";
+import { createApp, EMPTY_ROOM_MS, PRESENCE_MS } from "../server/app.js";
+import { createGame, join } from "../server/engine.js";
 import type { AddressInfo } from "node:net";
-test("API: сессии, права хоста, валидация, приватность и восстановление SQLite", async () => {
-  const { app, close } = createApp(":memory:");
-  const server = app.listen(0, "127.0.0.1");
-  await new Promise<void>((r) => server.once("listening", r));
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  try {
-    const a = await fetch(url + "/api/state");
-    const cookieA = a.headers.get("set-cookie")!.split(";")[0];
-    assert.equal((await a.json()).admin, true);
-    const b = await fetch(url + "/api/state");
-    const cookieB = b.headers.get("set-cookie")!.split(";")[0];
-    assert.equal((await b.json()).admin, false);
-    const post = (cookie: string, cmd: string, body: object = {}) =>
-      fetch(url + "/api/" + cmd, {
-        method: "POST",
-        headers: { cookie, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    assert.equal(
-      (
-        await post(cookieB, "settings", {
-          small: 10,
-          big: 20,
-          stack: 2000,
-          minutes: 10,
-        })
-      ).status,
-      403,
-    );
-    assert.equal((await post(cookieA, "join", { name: "Аня" })).status, 200);
-    assert.equal((await post(cookieB, "join", { name: "Борис" })).status, 200);
-    assert.equal((await post(cookieB, "bot", { seat: 2 })).status, 403);
-    const botResponse = await post(cookieA, "bot", { seat: 4 });
-    assert.equal(botResponse.status, 200);
-    const withBot = await botResponse.json();
-    assert.equal(
-      withBot.players.find((p: { seat: number }) => p.seat === 4).bot,
-      true,
-    );
-    assert.equal((await post(cookieA, "bot", { seat: 4 })).status, 400);
-    assert.equal((await post(cookieA, "bot", { seat: "2" })).status, 400);
-    assert.equal((await post(cookieB, "start")).status, 403);
-    const start = await post(cookieA, "start");
-    const state = await start.json();
-    assert.equal(state.players[0].cards.length, 2);
-    assert.equal(state.players[1].cards.length, 0);
-    assert.equal("deck" in state, false);
-    assert.equal(state.players[2].cards.length, 0);
-    assert.equal((await post(cookieA, "bot", { seat: 3 })).status, 400);
-    assert.equal(
-      (await post(cookieA, "remove", { id: state.players[2].id })).status,
-      400,
-    );
-    assert.equal(
-      (await post(cookieA, "chips", { id: state.me, amount: -1 })).status,
-      400,
-    );
-    assert.equal(
-      (
-        await fetch(url + "/api/join", {
-          method: "POST",
-          headers: {
-            origin: "https://foreign.example",
-            "Content-Type": "application/json",
-          },
-          body: "{}",
-        })
-      ).status,
-      403,
-    );
-  } finally {
-    await new Promise<void>((r, e) => server.close((x) => (x ? e(x) : r())));
-    close();
-  }
-});
+import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-test("SQLite восстанавливает участников, настройки и ту же сессию хоста", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "office-poker-"));
-  const path = join(dir, "game.sqlite");
-  async function open() {
-    const instance = createApp(path);
-    const server = instance.app.listen(0, "127.0.0.1");
-    await new Promise<void>((r) => server.once("listening", r));
-    return {
-      url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-      close: async () => {
-        await new Promise<void>((r, e) =>
-          server.close((x) => (x ? e(x) : r())),
-        );
-        instance.close();
+import { join as pathJoin } from "node:path";
+import { tokenHash } from "../server/accounts.js";
+const password = "test-password-123";
+const rules = { small: 10, big: 20, minutes: 10, step: 10 };
+async function open(path = ":memory:", now?: () => number) {
+  const instance = createApp(path, { now }),
+    server = instance.app.listen(0, "127.0.0.1");
+  await new Promise<void>((r) => server.once("listening", r));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const call = async (
+    cookie: string,
+    path: string,
+    body?: object,
+    extra: Record<string, string> = {},
+  ) => {
+    const response = await fetch(url + "/api/" + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        cookie,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...extra,
       },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return {
+      status: response.status,
+      data: await response.json(),
+      cookie: response.headers.get("set-cookie")?.split(";")[0],
+      headers: response.headers,
     };
-  }
-  let current = await open();
+  };
+  const setup = async () => {
+    const r = await call("", "setup", {
+      login: "admin",
+      name: "Администратор",
+      password,
+    });
+    assert.equal(r.status, 200);
+    return r.cookie!;
+  };
+  const add = async (admin: string, login: string, balance = 2000) => {
+    const r = await call(admin, "accounts", {
+      login,
+      name: login,
+      password,
+      balance,
+    });
+    assert.equal(r.status, 201);
+    const signed = await call("", "login", { login, password });
+    assert.equal(signed.status, 200);
+    return { cookie: signed.cookie!, user: r.data };
+  };
+  const create = async (
+    cookie: string,
+    name = "Новый стол",
+    settings = rules,
+  ) => {
+    const r = await call(cookie, "rooms", { name, settings });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    return r.data.room;
+  };
+  return {
+    instance,
+    call,
+    setup,
+    add,
+    create,
+    close: async () => {
+      await new Promise<void>((r, e) => server.close((x) => (x ? e(x) : r())));
+      instance.close();
+    },
+  };
+}
+test("Авторизация: закрытый API, локальная настройка, хеши, ротация сессий и выход", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-auth-")),
+    path = pathJoin(dir, "game.sqlite"),
+    s = await open(path);
   try {
-    const initial = await fetch(current.url + "/api/state");
-    const cookie = initial.headers.get("set-cookie")!.split(";")[0];
-    await fetch(current.url + "/api/join", {
-      method: "POST",
-      headers: { cookie, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Сохранённый игрок" }),
+    assert.deepEqual((await s.call("", "state")).data, {
+      account: null,
+      needsSetup: true,
+      canSetup: true,
+      rooms: [],
     });
-    await fetch(current.url + "/api/bot", {
-      method: "POST",
-      headers: { cookie, "Content-Type": "application/json" },
-      body: JSON.stringify({ seat: 3 }),
+    assert.equal((await s.call("", "accounts")).status, 401);
+    assert.equal(
+      (await s.call("", "rooms", { name: "Стол", settings: rules })).status,
+      401,
+    );
+    const admin = await s.setup();
+    assert.match(admin, /poker=/);
+    assert.equal(
+      (await s.call("", "setup", { login: "other", name: "Другой", password }))
+        .status,
+      403,
+    );
+    const regular = await s.add(admin, "player");
+    assert.equal((await s.call(regular.cookie, "accounts")).status, 403);
+    assert.equal(
+      (
+        await s.call(regular.cookie, "accounts", {
+          login: "hacker",
+          name: "Хакер",
+          password,
+          balance: 2000,
+          admin: true,
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await s.call("", "login", { login: "player", password: "wrong" }))
+        .status,
+      401,
+    );
+    assert.equal(
+      (await s.call("", "login", { login: "unknown", password: "wrong" }))
+        .status,
+      401,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "accounts", {
+          login: "player",
+          name: "Дубль",
+          password,
+          balance: 2,
+        })
+      ).status,
+      400,
+    );
+    const logged = await s.call(regular.cookie, "login", {
+      login: "PLAYER",
+      password,
     });
-    await current.close();
-    current = await open();
-    const state = await (
-      await fetch(current.url + "/api/state", { headers: { cookie } })
-    ).json();
-    assert.equal(state.admin, true);
-    assert.equal(state.players[0].name, "Сохранённый игрок");
-    assert.equal(state.players[0].id, state.me);
-    assert.equal(state.players[0].chips, 2000);
-    assert.equal(state.players[1].bot, true);
-    assert.equal(state.players[1].seat, 3);
+    assert.equal(logged.data.account.id, regular.user.id);
+    assert.notEqual(logged.cookie, regular.cookie);
+    assert.equal((await s.call(regular.cookie, "state")).data.account, null);
+    assert.match(logged.headers.get("set-cookie")!, /HttpOnly/);
+    assert.match(logged.headers.get("set-cookie")!, /SameSite=Strict/);
+    assert.equal((await s.call(logged.cookie!, "logout", {})).status, 200);
+    assert.equal((await s.call(logged.cookie!, "state")).data.account, null);
+    assert.equal(
+      (
+        await s.call(
+          admin,
+          "rooms",
+          { name: "Стол", settings: rules },
+          { origin: "https://foreign.example" },
+        )
+      ).status,
+      403,
+    );
+    const db = new DatabaseSync(path);
+    const rows = db.prepare("SELECT password FROM users").all() as {
+      password: string;
+    }[];
+    assert.ok(
+      rows.every((u) => u.password !== password && u.password.includes(":")),
+    );
+    db.close();
+    assert.equal("password" in regular.user, false);
+    assert.equal(
+      "password" in (await s.call(admin, "accounts")).data[0],
+      false,
+    );
   } finally {
-    await current.close();
+    await s.close();
     rmSync(dir, { recursive: true });
   }
 });
-test("Бот делает ход серверным таймером без запросов от игрока", async () => {
-  const instance = createApp(":memory:");
-  const server = instance.app.listen(0, "127.0.0.1");
-  await new Promise<void>((r) => server.once("listening", r));
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+test("Любой игрок создаёт стол с правилами; права хоста ограничены своим столом", async () => {
+  const s = await open();
   try {
-    const initial = await fetch(url + "/api/state");
-    const cookie = initial.headers.get("set-cookie")!.split(";")[0];
-    const post = (cmd: string, body: object = {}) =>
-      fetch(url + "/api/" + cmd, {
-        method: "POST",
-        headers: { cookie, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    await post("join", { name: "Человек" });
-    await post("bot", { seat: 1 });
-    const started = await (await post("start")).json();
-    await new Promise((r) =>
-      setTimeout(r, Math.max(0, started.deal.endsAt - Date.now()) + 20),
-    );
-    const before = await (await post("action", { kind: "call" })).json();
+    const admin = await s.setup(),
+      a = await s.add(admin, "alice"),
+      b = await s.add(admin, "boris");
+    assert.equal((await s.call(a.cookie, "state")).data.rooms.length, 0);
+    const first = await s.create(a.cookie, "Стол Алисы", {
+      small: 5,
+      big: 10,
+      minutes: 60,
+      step: 5,
+    });
+    const second = await s.create(b.cookie, "Стол Бориса");
+    assert.notEqual(first.room.id, second.room.id);
+    assert.equal(first.canManage, true);
+    assert.equal(first.admin, false);
+    assert.equal(first.settings.minutes, 60);
+    assert.equal(first.settings.step, 5);
+    const id = first.room.id;
     assert.equal(
-      before.players.find((p: { id: string }) => p.id === before.actor).bot,
+      (await s.call(b.cookie, `rooms/${id}/bot`, { seat: 2 })).status,
+      403,
+    );
+    assert.equal((await s.call(b.cookie, `rooms/${id}/start`, {})).status, 403);
+    assert.equal((await s.call(b.cookie, `rooms/${id}/pause`, {})).status, 403);
+    assert.equal(
+      (await s.call(b.cookie, `rooms/${id}/settings`, rules)).status,
+      403,
+    );
+    assert.equal(
+      (await s.call(a.cookie, `rooms/${id}/bot`, { seat: 4 })).status,
+      200,
+    );
+    assert.equal(
+      (await s.call(a.cookie, `rooms/${id}/bot`, { seat: 4 })).status,
+      400,
+    );
+    const bot = (await s.call(a.cookie, `rooms/${id}`)).data.room.players.find(
+      (p: any) => p.bot,
+    );
+    assert.equal(
+      (await s.call(a.cookie, `rooms/${id}/remove`, { id: bot.id })).status,
+      200,
+    );
+    assert.equal(
+      (await s.call(a.cookie, `rooms/${id}/remove`, { id: first.me })).status,
+      400,
+    );
+    assert.equal(
+      (await s.call(a.cookie, "rooms", { name: "Ещё один", settings: rules }))
+        .status,
+      400,
+    );
+    assert.equal((await s.call(b.cookie, `rooms/${id}/join`, {})).status, 400);
+    assert.equal(
+      (await s.call(b.cookie, `rooms/${second.room.id}/leave`, {})).status,
+      200,
+    );
+    assert.equal(
+      (
+        await s.call(b.cookie, `rooms/${id}/join`, {
+          name: "Подмена",
+          chips: 999999,
+        })
+      ).data.room.players.find((p: any) => p.id === b.user.id).name,
+      "boris",
+    );
+    await s.call(a.cookie, `rooms/${id}/leave`, {});
+    assert.equal(
+      (await s.call(b.cookie, `rooms/${id}`)).data.room.room.hostId,
+      b.user.id,
+    );
+    assert.equal(
+      (await s.call(b.cookie, `rooms/${id}/bot`, { seat: 5 })).status,
+      200,
+    );
+  } finally {
+    await s.close();
+  }
+});
+test("Баланс сохраняется при проигрыше, выходе, новом входе и перезапуске; фишки не дублируются", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-wallet-")),
+    path = pathJoin(dir, "game.sqlite");
+  let time = 1_800_000_000_000,
+    s = await open(path, () => time);
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "alice", 1255),
+      b = await s.add(admin, "boris", 2345),
+      room = await s.create(a.cookie),
+      id = room.room.id;
+    await s.call(b.cookie, `rooms/${id}/join`, {});
+    let r = (await s.call(a.cookie, `rooms/${id}/start`, {})).data.room;
+    time = r.deal.endsAt + 1;
+    assert.equal("deck" in r, false);
+    assert.equal(
+      r.players.find((p: any) => p.id === b.user.id).cards.length,
+      0,
+    );
+    assert.equal((await s.call(a.cookie, `rooms/${id}/leave`, {})).status, 400);
+    assert.equal(
+      (
+        await s.call(admin, `accounts/${a.user.id}`, {
+          login: "alice",
+          name: "alice",
+          balance: 9999,
+        })
+      ).status,
+      400,
+    );
+    const actorCookie = r.actor === a.user.id ? a.cookie : b.cookie;
+    r = (await s.call(actorCookie, `rooms/${id}/action`, { kind: "fold" })).data
+      .room;
+    assert.equal(r.phase, "showdown");
+    const folded = r.players.find((p: any) => p.folded);
+    assert.equal(folded.cards.length, 0);
+    assert.equal(folded.lastAction.kind, "fold");
+    assert.equal(r.players.find((p: any) => p.id !== r.me).cards.length, 0);
+    const alice = r.players.find((p: any) => p.id === a.user.id),
+      boris = r.players.find((p: any) => p.id === b.user.id);
+    assert.equal(alice.chips + boris.chips, 3600);
+    await s.call(a.cookie, `rooms/${id}/leave`, {});
+    await s.call(b.cookie, `rooms/${id}/leave`, {});
+    assert.equal(
+      (await s.call(a.cookie, "state")).data.account.balance,
+      alice.chips,
+    );
+    await s.close();
+    s = await open(path, () => time);
+    const logged = await s.call("", "login", { login: "alice", password });
+    assert.equal(logged.data.account.balance, alice.chips);
+    const next = await s.create(logged.cookie!, "Другой стол");
+    assert.equal(next.players[0].chips, alice.chips);
+    assert.equal((await s.call(a.cookie, "state")).data.account.id, a.user.id);
+    assert.equal((await s.call(a.cookie, `rooms/${id}/join`, {})).status, 400);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+test("Пустующий стол с ботами удаляется ровно через пять минут, ставки людей возвращаются", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "alice"),
+      r = await s.create(a.cookie),
+      id = r.room.id;
+    await s.call(a.cookie, `rooms/${id}/bot`, { seat: 1 });
+    await s.call(a.cookie, `rooms/${id}/leave`, {});
+    time += EMPTY_ROOM_MS - 1;
+    s.instance.maintenance();
+    assert.equal((await s.call(admin, "state")).data.rooms.length, 1);
+    time++;
+    s.instance.maintenance();
+    assert.equal((await s.call(admin, "state")).data.rooms.length, 0);
+    assert.equal((await s.call(a.cookie, `rooms/${id}`)).status, 404);
+    const live = await s.create(a.cookie, "Оборванная партия"),
+      liveId = live.room.id;
+    await s.call(a.cookie, `rooms/${liveId}/bot`, { seat: 1 });
+    const started = (await s.call(a.cookie, `rooms/${liveId}/start`, {})).data
+      .room;
+    assert.equal((await s.call(a.cookie, "state")).data.account.balance, 1990);
+    time += PRESENCE_MS + 1;
+    s.instance.maintenance();
+    time += EMPTY_ROOM_MS;
+    s.instance.maintenance();
+    assert.equal((await s.call(a.cookie, "state")).data.rooms.length, 0);
+    assert.equal((await s.call(a.cookie, "state")).data.account.balance, 2000);
+    assert.ok(started.players.some((p: any) => p.total > 0));
+  } finally {
+    await s.close();
+  }
+});
+test("Присутствие человека останавливает удаление, отключившийся хост передаёт права", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "alice"),
+      b = await s.add(admin, "boris"),
+      room = await s.create(a.cookie),
+      id = room.room.id;
+    await s.call(b.cookie, `rooms/${id}/join`, {});
+    time += PRESENCE_MS + 1;
+    await s.call(b.cookie, `rooms/${id}`);
+    s.instance.maintenance();
+    assert.equal(
+      (await s.call(b.cookie, `rooms/${id}`)).data.room.room.hostId,
+      b.user.id,
+    );
+    assert.equal(
+      (await s.call(a.cookie, `rooms/${id}/bot`, { seat: 2 })).status,
+      403,
+    );
+    time += PRESENCE_MS + 1;
+    s.instance.maintenance();
+    time += EMPTY_ROOM_MS - 1;
+    await s.call(a.cookie, `rooms/${id}`);
+    s.instance.maintenance();
+    assert.equal((await s.call(a.cookie, "state")).data.rooms.length, 1);
+    assert.equal(
+      (await s.call(a.cookie, "state")).data.rooms[0].emptySince,
+      null,
+    );
+  } finally {
+    await s.close();
+  }
+});
+test("Администратор задаёт доступ и баланс; смена пароля отзывает прежние сессии", async () => {
+  const s = await open();
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "alice"),
+      room = await s.create(a.cookie),
+      id = room.room.id;
+    const update = await s.call(admin, `accounts/${a.user.id}`, {
+      login: "alice",
+      name: "Алиса",
+      balance: 4500,
+      password: "another-password",
+    });
+    assert.equal(update.status, 200);
+    assert.equal((await s.call(a.cookie, "state")).data.account, null);
+    assert.equal(
+      (await s.call("", "login", { login: "alice", password })).status,
+      401,
+    );
+    const login = await s.call("", "login", {
+      login: "alice",
+      password: "another-password",
+    });
+    assert.equal(login.data.account.balance, 4500);
+    assert.equal(
+      (await s.call(login.cookie!, `rooms/${id}`)).data.room.players[0].chips,
+      4500,
+    );
+    assert.equal(
+      (
+        await s.call(admin, `accounts/${a.user.id}`, {
+          login: "alice",
+          name: "Алиса",
+          balance: -1,
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await s.call(admin, "accounts", {
+          login: "short",
+          name: "Короткий",
+          password: "123",
+          balance: 100,
+        })
+      ).status,
+      400,
+    );
+  } finally {
+    await s.close();
+  }
+});
+test("Бот ходит серверным таймером и учитывает шаг рейза, без запросов человека", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      r = await s.create(admin),
+      id = r.room.id;
+    await s.call(admin, `rooms/${id}/bot`, { seat: 1 });
+    const start = (await s.call(admin, `rooms/${id}/start`, {})).data.room;
+    time = start.deal.endsAt + 1;
+    const before = (await s.call(admin, `rooms/${id}/action`, { kind: "call" }))
+      .data.room;
+    assert.equal(
+      before.players.find((p: any) => p.id === before.actor).bot,
       true,
     );
-    await new Promise((r) => setTimeout(r, 4500));
-    const after = await (
-      await fetch(url + "/api/state", { headers: { cookie } })
-    ).json();
+    time += 4000;
+    s.instance.maintenance();
+    const after = (await s.call(admin, `rooms/${id}`)).data.room;
     assert.ok(after.log.length > before.log.length);
-    assert.ok(after.actor !== before.actor || after.phase !== "preflop");
   } finally {
-    await new Promise<void>((r, e) => server.close((x) => (x ? e(x) : r())));
-    instance.close();
+    await s.close();
+  }
+});
+test("Миграция сохраняет старые балансы, администратора и партию, но требует задать логин и пароль", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-migrate-")),
+    path = pathJoin(dir, "game.sqlite"),
+    db = new DatabaseSync(path);
+  const g = createGame();
+  join(g, "old-admin", "Старый хост");
+  join(g, "old-user", "Коллега");
+  g.players[0].chips = 12345;
+  g.players[1].chips = 4567;
+  db.exec(
+    "CREATE TABLE state(id INTEGER PRIMARY KEY,json TEXT);CREATE TABLE sessions(token TEXT PRIMARY KEY,id TEXT,admin INTEGER)",
+  );
+  db.prepare("INSERT INTO state VALUES(1,?)").run(JSON.stringify(g));
+  db.prepare("INSERT INTO sessions VALUES(?,?,1)").run(
+    tokenHash("legacy-cookie"),
+    "old-admin",
+  );
+  db.close();
+  const s = await open(path);
+  try {
+    const before = await s.call("poker=legacy-cookie", "state");
+    assert.equal(before.data.account, null);
+    const setup = await s.call("poker=legacy-cookie", "setup", {
+      login: "admin",
+      name: "Хост",
+      password,
+    });
+    assert.equal(setup.data.account.balance, 12345);
+    assert.equal(setup.data.account.id, "old-admin");
+    const users = (await s.call(setup.cookie!, "accounts")).data;
+    assert.equal(users.length, 2);
+    assert.equal(users.find((u: any) => u.id === "old-user").balance, 4567);
+    const activated = await s.call(setup.cookie!, "accounts/old-user", {
+      login: "colleague",
+      name: "Коллега",
+      password,
+      balance: 4567,
+    });
+    assert.equal(activated.status, 200);
+    const login = await s.call("", "login", { login: "colleague", password });
+    assert.equal(login.data.account.balance, 4567);
+    assert.equal(login.data.rooms[0].seated, true);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+test("Лимит неудачных попыток входа", async () => {
+  const s = await open();
+  try {
+    await s.setup();
+    for (let i = 0; i < 10; i++)
+      assert.equal(
+        (await s.call("", "login", { login: "admin", password: "bad" })).status,
+        401,
+      );
+    assert.equal(
+      (await s.call("", "login", { login: "admin", password })).status,
+      429,
+    );
+  } finally {
+    await s.close();
   }
 });

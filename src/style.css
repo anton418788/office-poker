@@ -2554,3 +2554,78 @@ h1 {
   filter: none;
   contain: layout style;
 }
+/* Actions stay visible until the player's next move or the next hand. */
+.player-action {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  border: 1px solid #88a58c;
+  background: #eaf4e7;
+  color: #31583e;
+  box-shadow: 0 3px 10px #11271a25;
+  border-radius: 20px;
+  padding: 5px 11px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+.player-action.action-fold {
+  background: #eee4de;
+  border-color: #b89a8b;
+  color: #795d50;
+}
+.player-action.action-raise {
+  background: #f1dfae;
+  border-color: #c6a65e;
+  color: #665020;
+}
+.discarded-cards {
+  display: flex;
+  gap: 0;
+  transform: translate(8px, -8px) rotate(12deg);
+  opacity: 0.9;
+}
+.discarded-cards .card {
+  filter: saturate(0.6);
+}
+.discarded-cards .card + .card {
+  margin-left: -32px;
+  transform: translateY(6px) rotate(-22deg);
+}
+.seat.folded .seat-cards {
+  opacity: 1;
+}
+[data-theme="club"] .player-action {
+  background: #264d37;
+  color: #e1f1d9;
+  border-color: #729569;
+}
+[data-theme="club"] .player-action.action-fold {
+  background: #41362c;
+  color: #e8cbb6;
+  border-color: #8a6a51;
+}
+[data-theme="club"] .player-action.action-raise {
+  background: #65552d;
+  color: #fff0b5;
+  border-color: #bfa15d;
+}
+@media (max-width: 680px) {
+  .player-action {
+    font-size: 10px;
+    padding: 3px 7px;
+    top: calc(100% + 6px);
+  }
+  .discarded-cards {
+    transform: translate(5px, -5px) rotate(12deg);
+  }
+  .discarded-cards .card + .card {
+    margin-left: -20px;
+  }
+}
+
+.acting .player-action {
+  top: calc(100% + 30px);
+}

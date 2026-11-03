@@ -142,9 +142,10 @@ export function start(g: Game, now = Date.now(), animate = false) {
   g.phase = "preflop";
   g.acted = [];
   g.currentBet = g.settings.big;
-  g.minRaise = g.settings.big;
+  g.minRaise = Math.max(g.settings.big, g.settings.step ?? 1);
   for (const p of g.players) {
     p.cards = [];
+    delete p.lastAction;
     p.folded = p.chips === 0;
     p.bet = 0;
     p.total = 0;
@@ -280,7 +281,7 @@ function advance(g: Game, seat: number, now: number) {
   g.phase =
     g.phase === "preflop" ? "flop" : g.phase === "flop" ? "turn" : "river";
   g.currentBet = 0;
-  g.minRaise = g.settings.big;
+  g.minRaise = Math.max(g.settings.big, g.settings.step ?? 1);
   g.acted = [];
   g.players.forEach((p) => (p.bet = 0));
   log(
@@ -301,7 +302,7 @@ export function action(
   const boardFrom = g.board.length;
   if (!running(g) || g.actor !== id) throw Error("Сейчас ход другого игрока");
   const p = g.players.find((p) => p.id === id)!;
-  const call = Math.max(0, g.currentBet - p.bet);
+  const call = Math.min(p.chips, Math.max(0, g.currentBet - p.bet));
   if (kind === "fold") {
     p.folded = true;
     log(g, `${p.name}: пас`);
@@ -326,6 +327,8 @@ export function action(
       amount! <= g.currentBet
     )
       throw Error("Некорректная ставка");
+    if (amount !== p.bet + p.chips && amount! % (g.settings.step ?? 1) !== 0)
+      throw Error(`Ставка должна быть кратна ${g.settings.step ?? 1}`);
     const increase = amount! - g.currentBet;
     if (increase < g.minRaise && amount !== p.bet + p.chips)
       throw Error(`Минимум до ${g.currentBet + g.minRaise}`);
@@ -339,6 +342,15 @@ export function action(
     g.currentBet = amount!;
     log(g, `${p.name}: ${p.chips === 0 ? "олл-ин" : "рейз"} до ${amount}`);
   } else throw Error("Неизвестное действие");
+  p.lastAction = {
+    kind: kind as "fold" | "check" | "call" | "raise",
+    hand: g.hand,
+    ...(kind === "call"
+      ? { amount: call }
+      : kind === "raise"
+        ? { amount: p.bet }
+        : {}),
+  };
   if (!g.acted.includes(id)) g.acted.push(id);
   advance(g, p.seat, now);
   present(g, false, boardFrom, now);
@@ -384,13 +396,18 @@ export function view(g: Game, id: string, admin: boolean): View {
     players: g.players.map((p) => ({
       ...p,
       cards:
-        p.id === id || (g.phase === "showdown" && !p.folded) ? p.cards : [],
+        !p.folded &&
+        (p.id === id || (g.phase === "showdown" && !g.lastResult?.byFold))
+          ? p.cards
+          : [],
     })),
     me: id,
     admin,
     legal: {
       call: p ? Math.min(p.chips, Math.max(0, g.currentBet - p.bet)) : 0,
-      min: g.currentBet + g.minRaise,
+      min:
+        Math.ceil((g.currentBet + g.minRaise) / (g.settings.step ?? 1)) *
+        (g.settings.step ?? 1),
       max: p ? p.chips + p.bet : 0,
       canRaise:
         !!p &&

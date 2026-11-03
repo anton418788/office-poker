@@ -66,7 +66,11 @@ export function decide(
       v.legal.min,
       v.currentBet + Math.max(v.settings.big, Math.round(pot * 0.55)),
     );
-    return { kind: "raise", amount: Math.min(v.legal.max, target) };
+    const step = v.settings.step ?? 1;
+    return {
+      kind: "raise",
+      amount: Math.min(v.legal.max, Math.ceil(target / step) * step),
+    };
   }
   return { kind: v.legal.call ? "call" : "check" };
 }

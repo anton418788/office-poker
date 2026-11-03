@@ -264,23 +264,33 @@ export function PokerTable({
               {p ? (
                 <>
                   <div className="seat-cards">
-                    {p.cards.length
-                      ? p.cards
-                          .slice(0, presentation.holeCount(seat))
-                          .map((c, i) => (
-                            <div
-                              key={i}
-                              className={`pocket-slot ${winningHole.includes(i) ? "winning-pocket-card" : ""}`}
-                            >
-                              <Card card={c} small />
-                            </div>
-                          ))
-                      : inHand && !p.folded
-                        ? Array.from(
-                            { length: presentation.holeCount(seat) },
-                            (_, i) => <Card key={i} back small />,
-                          )
-                        : null}
+                    {p.folded &&
+                    p.lastAction?.kind === "fold" &&
+                    p.lastAction.hand === g.hand ? (
+                      <div
+                        className="discarded-cards"
+                        aria-label={`Сброшенные карты: ${p.name}`}
+                      >
+                        <Card back small />
+                        <Card back small />
+                      </div>
+                    ) : p.cards.length ? (
+                      p.cards
+                        .slice(0, presentation.holeCount(seat))
+                        .map((c, i) => (
+                          <div
+                            key={i}
+                            className={`pocket-slot ${winningHole.includes(i) ? "winning-pocket-card" : ""}`}
+                          >
+                            <Card card={c} small />
+                          </div>
+                        ))
+                    ) : inHand && !p.folded ? (
+                      Array.from(
+                        { length: presentation.holeCount(seat) },
+                        (_, i) => <Card key={i} back small />,
+                      )
+                    ) : null}
                   </div>
                   <div className="player">
                     <span className={`avatar color-${seat}`}>
@@ -296,30 +306,53 @@ export function PokerTable({
                     </div>
                     {g.dealer === seat && <i className="dealer">D</i>}
                   </div>
+                  {p.lastAction?.hand === g.hand && (
+                    <span
+                      className={`player-action action-${p.lastAction.kind}`}
+                      aria-label={`Действие ${p.name}`}
+                    >
+                      {
+                        {
+                          fold: "Фолд",
+                          check: "Чек",
+                          call: "Колл",
+                          raise: "Рейз",
+                        }[p.lastAction.kind]
+                      }
+                      {p.lastAction.amount !== undefined
+                        ? ` ${format(p.lastAction.amount)}`
+                        : ""}
+                      {p.chips === 0 &&
+                      ["call", "raise"].includes(p.lastAction.kind)
+                        ? " · олл-ин"
+                        : ""}
+                    </span>
+                  )}
                   <div className="player-rack">
                     <ChipPile amount={visibleChips} compact />
                   </div>
-                  {inHand && (
-                    <span className="seat-info">
-                      {p.folded
-                        ? "Пас"
-                        : visibleChips === 0
-                          ? "Олл-ин"
-                          : p.id === g.actor
-                            ? p.id === g.me
-                              ? "Ваш ход"
-                              : "Думает…"
-                            : p.bet
-                              ? `Ставка ${format(p.bet)}`
-                              : "В игре"}
-                    </span>
-                  )}
+                  {inHand &&
+                    (p.id === g.actor || p.lastAction?.hand !== g.hand) && (
+                      <span className="seat-info">
+                        {p.folded
+                          ? "Пас"
+                          : visibleChips === 0
+                            ? "Олл-ин"
+                            : p.id === g.actor
+                              ? p.id === g.me
+                                ? "Ваш ход"
+                                : "Думает…"
+                              : p.bet
+                                ? `Ставка ${format(p.bet)}`
+                                : "В игре"}
+                      </span>
+                    )}
                 </>
               ) : (
                 <div className="empty-seat">
                   <span className="seat-number">{seat + 1}</span>
                   <span>Свободно</span>
-                  {g.admin && !inHand && (
+                  {g.canManage && !inHand && (
                     <button
                       className="seat-bot"
                       disabled={busy}

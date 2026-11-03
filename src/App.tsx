@@ -4,7 +4,8 @@ import "./style.css";
 import { useGameSounds } from "./useGameSounds";
 import { Card } from "./Card";
 import { PokerTable } from "./PokerTable";
-import { CombinationsPanel } from "./CombinationsPanel";
+import { TableSidebar } from "./TableSidebar";
+import { useDealPresentation } from "./useDealPresentation";
 const format = (n: number) => n.toLocaleString("ru-RU");
 export default function App() {
   const [g, setG] = useState<View | null>(null),
@@ -29,8 +30,8 @@ export default function App() {
       return false;
     }
   });
-  const [showCombinations, setShowCombinations] = useState(false);
   const sound = useGameSounds(g);
+  const presentation = useDealPresentation(g, sound.play);
   function toggleMenu() {
     setMenuHidden((hidden) => {
       try {
@@ -55,7 +56,7 @@ export default function App() {
         })
         .catch(() => alive && setError("Нет связи с сервером"));
     load();
-    const poll = setInterval(load, 2000),
+    const poll = setInterval(load, 400),
       clock = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       alive = false;
@@ -83,8 +84,24 @@ export default function App() {
   }
   const me = g?.players.find((p) => p.id === g.me),
     active = g?.players.find((p) => p.id === g.actor),
+    visibleStack = me
+      ? Math.max(
+          0,
+          me.chips -
+            (presentation.active && g?.phase === "showdown"
+              ? (g.transfers ?? [])
+                  .filter(
+                    (t) =>
+                      t.hand === g.hand &&
+                      t.kind === "payout" &&
+                      t.seat === me.seat,
+                  )
+                  .reduce((n, t) => n + t.amount, 0)
+              : 0),
+        )
+      : 0,
     inHand = g && !["waiting", "showdown"].includes(g.phase),
-    myTurn = !!g && g.actor === g.me && !g.paused,
+    myTurn = !!g && g.actor === g.me && !g.paused && !presentation.active,
     amount = g
       ? Math.max(
           Math.min(raise, g.legal.max),
@@ -187,12 +204,6 @@ export default function App() {
           </div>
           <div className="profile">
             <button
-              className="combinations-button"
-              onClick={() => setShowCombinations(true)}
-            >
-              ♠ <span>Комбинации</span>
-            </button>
-            <button
               className="sound-toggle"
               onClick={sound.toggle}
               aria-label={sound.enabled ? "Выключить звуки" : "Включить звуки"}
@@ -238,51 +249,22 @@ export default function App() {
           <>
             <div className="game-layout">
               <section className="game-area">
-                <PokerTable game={g} busy={busy} send={send} />
+                <PokerTable
+                  game={g}
+                  busy={busy || presentation.active}
+                  send={send}
+                  presentation={presentation}
+                />
               </section>
-              <aside className="activity">
-                <div className="panel-title">
-                  Ритм игры <span>◷</span>
-                </div>
-                <div className="turn-box">
-                  <span>
-                    {g.paused
-                      ? "Можно вернуться к работе"
-                      : active
-                        ? active.id === g.me
-                          ? "Ваш ход"
-                          : `Ходит ${active.name}`
-                        : "Все на месте?"}
-                  </span>
-                  <strong>{timer}</strong>
-                  <p>
-                    {g.paused
-                      ? "Таймер остановлен"
-                      : g.actor
-                        ? "До автоматического чека или паса"
-                        : "Хост запустит следующую раздачу"}
-                  </p>
-                </div>
-                <div className="panel-title history-title">
-                  За столом <span>↗</span>
-                </div>
-                <div className="history">
-                  {g.log.length ? (
-                    g.log.slice(0, 12).map((s, i) => (
-                      <div key={i} className={i === 0 ? "latest" : ""}>
-                        <i />
-                        {s}
-                      </div>
-                    ))
-                  ) : (
-                    <div>
-                      Здесь появится история партии. Приглашайте коллег!
-                    </div>
-                  )}
-                </div>
-              </aside>
+              <TableSidebar
+                game={g}
+                hole={me?.cards.slice(0, presentation.holeCount(me.seat)) ?? []}
+                board={g.board.slice(0, presentation.boardFaces)}
+                timer={timer}
+                dealing={presentation.active}
+              />
             </div>
-            {g.result.length > 0 && (
+            {g.result.length > 0 && !presentation.active && (
               <div className="result">✦ {g.result.join(" · ")}</div>
             )}
             {!me ? (
@@ -324,22 +306,28 @@ export default function App() {
                 <div className="your-hand">
                   <div className="hand-cards">
                     {me.cards.length ? (
-                      me.cards.map((c, i) => <Card key={i} card={c} small />)
+                      me.cards
+                        .slice(0, presentation.holeCount(me.seat))
+                        .map((c, i) => <Card key={i} card={c} small />)
                     ) : (
                       <span className="waiting-cards">♠ ♥</span>
                     )}
                   </div>
                   <div>
                     <small>{myTurn ? "ВАШ ХОД" : "ВАШ СТЕК"}</small>
-                    <strong>◉ {format(me.chips)}</strong>
+                    <strong>◉ {format(visibleStack)}</strong>
                     <span>
-                      {myTurn
-                        ? "Время принимать решение"
-                        : g.paused
-                          ? "Игра на паузе"
-                          : inHand
-                            ? "Можно спокойно работать"
-                            : "Готовы к новой раздаче"}
+                      {g.paused
+                        ? "Игра на паузе"
+                        : presentation.active
+                          ? "Дилер раздаёт карты…"
+                          : myTurn
+                            ? "Время принимать решение"
+                            : g.paused
+                              ? "Игра на паузе"
+                              : inHand
+                                ? "Можно спокойно работать"
+                                : "Готовы к новой раздаче"}
                     </span>
                   </div>
                 </div>
@@ -464,7 +452,10 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="action-buttons">
-                    <button disabled={busy} onClick={() => send("leave")}>
+                    <button
+                      disabled={busy || presentation.active}
+                      onClick={() => send("leave")}
+                    >
                       Покинуть стол
                     </button>
                     {g.admin && (
@@ -472,8 +463,10 @@ export default function App() {
                         className="primary"
                         disabled={
                           busy ||
+                          presentation.active ||
                           g.paused ||
-                          g.players.filter((p) => p.chips > 0).length < 2
+                          g.players.filter((p) => p.chips > 0 || p.bot).length <
+                            2
                         }
                         onClick={() => send("start")}
                       >
@@ -548,9 +541,10 @@ export default function App() {
                   className="primary"
                   disabled={
                     !!inHand ||
+                    presentation.active ||
                     g.paused ||
                     busy ||
-                    g.players.filter((p) => p.chips > 0).length < 2
+                    g.players.filter((p) => p.chips > 0 || p.bot).length < 2
                   }
                   onClick={() => send("start")}
                 >
@@ -633,13 +627,6 @@ export default function App() {
           </div>
         )}
       </main>
-      {showCombinations && (
-        <CombinationsPanel
-          hole={me?.cards ?? []}
-          board={g.board}
-          onClose={() => setShowCombinations(false)}
-        />
-      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isDealing } from "../shared/dealing.js";
 import type { Card, Game, View } from "../shared/types.js";
 import { action, join, running, tick, view } from "./engine.js";
 import { compare, evaluate } from "./poker.js";
@@ -72,7 +73,7 @@ export function decide(
 
 // One move per tick keeps the table readable and stops immediately on a human turn.
 export function step(g: Game, now = Date.now(), random = Math.random): boolean {
-  if (g.paused || !running(g)) return false;
+  if (g.paused || !running(g) || isDealing(g, now)) return false;
   if (tick(g, now)) return true;
   const bot = g.players.find((p) => p.id === g.actor && p.bot);
   if (!bot || !g.deadline) return false;

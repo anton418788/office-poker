@@ -12,6 +12,7 @@ import {
   log,
 } from "./engine.js";
 import { addBot, step } from "./bots.js";
+import { isDealing } from "../shared/dealing.js";
 import type { Game } from "../shared/types.js";
 export function createApp(path: string) {
   const db = new DatabaseSync(path);
@@ -107,7 +108,8 @@ export function createApp(path: string) {
           action(next, s.id, b.kind, b.amount);
           break;
         case "leave": {
-          if (running(next)) throw Error("Выйти можно между раздачами");
+          if (running(next) || isDealing(next))
+            throw Error("Выйти можно между раздачами");
           next.players = next.players.filter((p) => p.id !== s.id);
           break;
         }
@@ -121,13 +123,13 @@ export function createApp(path: string) {
             res.status(403).json({ error: "Нужны права администратора" });
             return;
           }
-          if (req.params.command === "start") start(next);
+          if (req.params.command === "start") start(next, Date.now(), true);
           if (req.params.command === "pause") pause(next);
           if (
             ["bot", "settings", "chips", "remove"].includes(
               req.params.command,
             ) &&
-            running(next)
+            (running(next) || isDealing(next))
           )
             throw Error("Это доступно только между раздачами");
           if (req.params.command === "bot") addBot(next, b.seat);

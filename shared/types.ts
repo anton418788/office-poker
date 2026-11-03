@@ -17,7 +17,22 @@ export type ChipTransfer = {
   amount: number;
   kind: "bet" | "payout";
 };
+export type DealPresentation = {
+  timing?: { interval: number; flight: number; flip: number; lead: number };
+  id: number;
+  hand: number;
+  dealer: number;
+  seats: number[];
+  hole: boolean;
+  boardFrom: number;
+  boardTo: number;
+  startedAt: number;
+  endsAt: number;
+  pausedAt?: number;
+};
 export type Game = {
+  deal?: DealPresentation;
+  dealAnimations?: boolean;
   transferSeq?: number;
   transfers?: ChipTransfer[];
   players: Player[];

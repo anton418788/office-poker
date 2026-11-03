@@ -143,7 +143,10 @@ test("Бот делает ход серверным таймером без за
       });
     await post("join", { name: "Человек" });
     await post("bot", { seat: 1 });
-    await post("start");
+    const started = await (await post("start")).json();
+    await new Promise((r) =>
+      setTimeout(r, Math.max(0, started.deal.endsAt - Date.now()) + 20),
+    );
     const before = await (await post("action", { kind: "call" })).json();
     assert.equal(
       before.players.find((p: { id: string }) => p.id === before.actor).bot,

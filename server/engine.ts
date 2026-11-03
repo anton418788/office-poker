@@ -1,5 +1,14 @@
 import type { Game, Player, View } from "../shared/types.js";
 import { deck, evaluate, compare, combinations } from "./poker.js";
+import {
+  cardMoves,
+  dealOrder,
+  isDealing,
+  CARD_INTERVAL,
+  CARD_FLIGHT,
+  CARD_FLIP,
+  DEAL_LEAD,
+} from "../shared/dealing.js";
 export function createGame(): Game {
   return {
     players: [],
@@ -84,11 +93,44 @@ function turn(g: Game, p: Player, now: number) {
   g.actor = p.id;
   g.deadline = now + g.settings.minutes * 60_000;
 }
-export function start(g: Game, now = Date.now()) {
-  if (running(g)) throw Error("Раздача уже идёт");
+function present(g: Game, hole: boolean, boardFrom: number, now: number) {
+  if (!g.dealAnimations || (!hole && boardFrom === g.board.length)) return;
+  const plan = {
+    timing: {
+      interval: CARD_INTERVAL,
+      flight: CARD_FLIGHT,
+      flip: CARD_FLIP,
+      lead: DEAL_LEAD,
+    },
+    id: (g.deal?.id ?? 0) + 1,
+    hand: g.hand,
+    dealer: g.dealer,
+    seats: dealOrder(
+      g.players.filter((p) => p.cards.length === 2).map((p) => p.seat),
+      g.dealer,
+    ),
+    hole,
+    boardFrom,
+    boardTo: g.board.length,
+    startedAt: now,
+    endsAt: now,
+  };
+  const moves = cardMoves(plan);
+  plan.endsAt = (moves.at(-1)?.flip ?? now) + 180;
+  g.deal = plan;
+  if (g.actor) g.deadline = plan.endsAt + g.settings.minutes * 60_000;
+}
+export function start(g: Game, now = Date.now(), animate = false) {
+  if (running(g) || isDealing(g, now)) throw Error("Раздача уже идёт");
   if (g.paused) throw Error("Сначала снимите паузу");
-  const players = g.players.filter((p) => p.chips > 0);
+  const players = g.players.filter((p) => p.chips > 0 || p.bot);
   if (players.length < 2) throw Error("Нужны хотя бы два игрока с фишками");
+  for (const p of players)
+    if (p.bot && p.chips === 0) {
+      p.chips = g.settings.stack;
+      log(g, `${p.name}: новый стек ${g.settings.stack} (автопополнение)`);
+    }
+  g.dealAnimations = animate;
   g.dealer = after(g, g.dealer, players).seat;
   g.deck = deck();
   g.board = [];
@@ -99,11 +141,18 @@ export function start(g: Game, now = Date.now()) {
   g.currentBet = g.settings.big;
   g.minRaise = g.settings.big;
   for (const p of g.players) {
-    p.cards = p.chips > 0 ? [g.deck.pop()!, g.deck.pop()!] : [];
-    p.folded = !p.cards.length;
+    p.cards = [];
+    p.folded = p.chips === 0;
     p.bet = 0;
     p.total = 0;
   }
+  const order = dealOrder(
+    players.map((p) => p.seat),
+    g.dealer,
+  );
+  for (let round = 0; round < 2; round++)
+    for (const seat of order)
+      g.players.find((p) => p.seat === seat)!.cards.push(g.deck.pop()!);
   const small =
     players.length === 2
       ? players.find((p) => p.seat === g.dealer)!
@@ -113,6 +162,7 @@ export function start(g: Game, now = Date.now()) {
   pay(g, big, g.settings.big);
   log(g, `Раздача #${g.hand} · блайнды ${g.settings.small}/${g.settings.big}`);
   advance(g, big.seat, now);
+  present(g, true, 0, now);
 }
 export function settle(g: Game) {
   const candidates = live(g);
@@ -212,6 +262,8 @@ export function action(
   now = Date.now(),
 ) {
   if (g.paused) throw Error("Игра на паузе");
+  if (isDealing(g, now)) throw Error("Дождитесь завершения раздачи карт");
+  const boardFrom = g.board.length;
   if (!running(g) || g.actor !== id) throw Error("Сейчас ход другого игрока");
   const p = g.players.find((p) => p.id === id)!;
   const call = Math.max(0, g.currentBet - p.bet);
@@ -249,9 +301,16 @@ export function action(
   } else throw Error("Неизвестное действие");
   if (!g.acted.includes(id)) g.acted.push(id);
   advance(g, p.seat, now);
+  present(g, false, boardFrom, now);
 }
 export function tick(g: Game, now = Date.now()) {
-  if (!g.paused && g.deadline && now >= g.deadline && g.actor) {
+  if (
+    !g.paused &&
+    !isDealing(g, now) &&
+    g.deadline &&
+    now >= g.deadline &&
+    g.actor
+  ) {
     const p = g.players.find((p) => p.id === g.actor)!;
     log(g, `${p.name}: время вышло`);
     action(g, p.id, p.bet >= g.currentBet ? "check" : "fold", undefined, now);
@@ -262,8 +321,15 @@ export function tick(g: Game, now = Date.now()) {
 export function pause(g: Game, now = Date.now()) {
   if (g.paused) {
     g.paused = false;
+    if (g.deal?.pausedAt !== undefined) {
+      const shift = now - g.deal.pausedAt;
+      g.deal.startedAt += shift;
+      g.deal.endsAt += shift;
+      delete g.deal.pausedAt;
+    }
     if (g.actor) g.deadline = now + g.remaining;
   } else {
+    if (isDealing(g, now) && g.deal) g.deal.pausedAt = now;
     g.remaining = g.deadline ? Math.max(0, g.deadline - now) : 0;
     g.paused = true;
     g.deadline = null;

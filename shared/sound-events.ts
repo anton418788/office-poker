@@ -1,5 +1,6 @@
 import type { View } from "./types";
-export type GameSound = "cards" | "chips" | "payout" | "turn";
+export type GameSound =
+  "cards" | "chips" | "payout" | "turn" | "deal" | "flip" | "shuffle";
 // Compare authoritative snapshots so polling the same state never repeats a sound.
 export function soundEvents(previous: View | null, next: View): GameSound[] {
   if (!previous) return [];

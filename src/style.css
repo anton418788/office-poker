@@ -1967,3 +1967,426 @@ h1 {
     bottom: 8px;
   }
 }
+/* Table-side tools stay beside the game instead of interrupting it with a modal. */
+.table-tools {
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  min-width: 0;
+  border: 1px solid #d7dfca;
+  border-radius: 16px;
+  background: #f9fbf2;
+  overflow: hidden;
+  box-shadow: 0 5px 20px #344b2410;
+}
+.tool-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 7px;
+  background: #e8eddf;
+  border-bottom: 1px solid #d9e1cd;
+}
+.tool-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 11px;
+  padding: 11px 8px;
+  border-color: transparent;
+  background: transparent;
+  border-radius: 9px;
+  font-weight: 500;
+}
+.tool-tabs b {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 400;
+}
+.tool-tabs button[aria-selected="true"] {
+  background: #faffed;
+  color: #496238;
+  box-shadow: 0 2px 5px #354b2412;
+  border-color: #d4dfc1;
+}
+.tool-body {
+  position: relative;
+  max-height: calc(100svh - 170px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #bdcda5 transparent;
+}
+.close-tool {
+  position: absolute;
+  top: 11px;
+  right: 9px;
+  z-index: 2;
+  padding: 2px 8px;
+  background: transparent;
+  border: 0;
+  color: #80906f;
+  font-size: 22px;
+  line-height: 1.3;
+}
+.side-odds.odds-content {
+  padding: 19px 16px 12px;
+}
+.side-odds .odds-heading {
+  padding-right: 20px;
+}
+.side-odds .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.side-odds .odds-heading h2 {
+  font-size: 19px;
+  letter-spacing: -0.6px;
+  margin: 6px 0 0;
+}
+.side-odds .odds-intro {
+  font-size: 11px;
+  line-height: 1.55;
+  margin: 13px 0 10px;
+}
+.side-odds .odds-meta {
+  font-size: 10px;
+  padding: 10px 11px;
+  line-height: 1.5;
+}
+.side-odds .odds-meta small {
+  font-size: 9px;
+}
+.side-odds .odds-rows {
+  margin-top: 9px;
+}
+.side-odds .odds-row {
+  padding: 10px 1px;
+  gap: 8px;
+}
+.side-odds .odds-name > b {
+  font-size: 12px;
+}
+.side-odds .odds-name > small {
+  font-size: 8px;
+  padding: 2px 4px;
+}
+.side-odds .example-cards {
+  gap: 2px;
+  margin-top: 1px;
+}
+.side-odds .example-cards span {
+  font-size: 10px;
+  min-width: 21px;
+  padding: 3px 2px;
+}
+.side-odds .odds-chance {
+  width: 72px;
+}
+.side-odds .odds-chance strong {
+  font-size: 13px;
+}
+.table-tools .activity {
+  display: block;
+  border: 0;
+  border-radius: 0;
+  padding: 22px 17px;
+}
+.table-tools .history {
+  max-height: none;
+}
+.table-tools .turn-box strong {
+  font-size: 27px;
+}
+@media (min-width: 1100px) {
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 18px;
+  }
+  .game-layout:has(.table-tools:not(.tools-open)) {
+    grid-template-columns: minmax(0, 1fr) 58px;
+  }
+  .table-tools:not(.tools-open) .tool-tabs {
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    padding: 5px;
+  }
+  .table-tools:not(.tools-open) .tool-tabs button {
+    padding: 12px 8px;
+  }
+  .table-tools:not(.tools-open) .tool-tabs span {
+    display: none;
+  }
+}
+@media (max-width: 1099px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+  .table-tools {
+    position: fixed;
+    right: 18px;
+    top: 90px;
+    z-index: 12;
+    max-width: min(320px, calc(100vw - 32px));
+    box-shadow: 0 12px 40px #283f2526;
+  }
+  .table-tools:not(.tools-open) {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .table-tools:not(.tools-open) .tool-tabs {
+    padding: 4px;
+    border: 1px solid #d4ddc7;
+    border-radius: 12px;
+    background: #f9fcf0ed;
+  }
+  .table-tools:not(.tools-open) .tool-tabs button {
+    padding: 8px 10px;
+  }
+  .table-tools:not(.tools-open) .tool-tabs span {
+    display: none;
+  }
+  .tool-body {
+    max-height: calc(100svh - 300px);
+  }
+}
+@media (max-width: 680px) {
+  .table-tools {
+    right: 12px;
+    top: 75px;
+  }
+  .tool-tabs button {
+    padding: 9px 8px;
+  }
+  .tool-body {
+    max-height: calc(100svh - 350px);
+  }
+}
+/* The deck follows the dealer; each card is advanced using the shared server timeline. */
+.dealer-deck {
+  position: absolute;
+  width: 40px;
+  height: 57px;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px #142a2050);
+}
+.deck-layer {
+  position: absolute;
+  inset: 0;
+}
+.dealer-deck > span {
+  position: absolute;
+  top: 57px;
+  left: -12px;
+  right: -12px;
+  text-align: center;
+  font-size: 9px;
+  color: #d7e3c6;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #15271d;
+}
+.card-flights {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+.dealing-card {
+  position: absolute;
+  transition:
+    left 0.04s linear,
+    top 0.04s linear,
+    transform 0.04s linear;
+  filter: drop-shadow(0 9px 7px #152a2040);
+}
+.dealing-card .card.small {
+  width: 42px;
+  height: 60px;
+}
+.dealing-card .card.back {
+  border-color: #f0efdb;
+}
+.card-hand .occupied .seat-cards {
+  min-height: 52px;
+}
+.board-slot {
+  perspective: 700px;
+}
+.board-revealed .card {
+  animation: board-turn 0.32s ease-out both;
+}
+@keyframes board-turn {
+  from {
+    transform: rotateY(85deg);
+    filter: brightness(0.65);
+  }
+  to {
+    transform: rotateY(0);
+    filter: brightness(1);
+  }
+}
+@media (max-width: 680px) {
+  .card-hand .occupied .seat-cards {
+    min-height: 43px;
+  }
+  .dealer-deck {
+    scale: 0.8;
+  }
+  .dealing-card .card.small {
+    width: 31px;
+    height: 45px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-flights {
+    display: none;
+  }
+  .board-revealed .card {
+    animation: none;
+  }
+  .dealing-card {
+    transition: none;
+  }
+}
+@container (max-width:650px) {
+  .seat,
+  .player,
+  .menu-collapsed .seat,
+  .menu-collapsed .player {
+    width: 120px;
+  }
+  .seat-1,
+  .seat-2 {
+    left: 15%;
+  }
+  .seat-4,
+  .seat-5 {
+    left: 85%;
+  }
+  .player {
+    padding: 7px;
+    gap: 5px;
+    min-height: 53px;
+  }
+  .player b,
+  .menu-collapsed .player b {
+    font-size: 10px;
+    max-width: 78px;
+  }
+  .player div > span,
+  .menu-collapsed .player div > span {
+    font-size: 12px;
+  }
+  .avatar {
+    width: 27px;
+    height: 27px;
+    font-size: 14px;
+  }
+  .game-area .community {
+    gap: 5px;
+  }
+  .game-area .community .card {
+    width: 38px;
+    height: 56px;
+    padding: 5px;
+  }
+  .game-area .community .card b {
+    font-size: 18px;
+  }
+  .game-area .community .card > span {
+    font-size: 22px;
+  }
+  .game-area .stage {
+    top: calc(54% + 68px);
+    font-size: 10px;
+  }
+  .seat-info {
+    font-size: 9px;
+  }
+  .player-rack .chip-pile,
+  .menu-collapsed .player-rack .chip-pile {
+    scale: 0.85;
+  }
+  .seat-cards .card.small {
+    width: 30px;
+    height: 43px;
+    padding: 4px;
+  }
+  .card-hand .occupied .seat-cards {
+    min-height: 43px;
+  }
+  .dealer-deck {
+    scale: 0.85;
+  }
+}
+.is-paused .flying-chip,
+.is-paused .flying-chip > .poker-chip {
+  animation-play-state: paused;
+}
+.table-tools {
+  display: flex;
+  flex-direction: column;
+}
+.table-tools.tools-open {
+  height: min(720px, calc(100svh - 390px));
+}
+.table-tools .tool-tabs {
+  flex-shrink: 0;
+}
+.table-tools .tool-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+@media (max-width: 1099px) {
+  .table-tools.tools-open {
+    height: calc(100svh - 360px);
+    max-height: none;
+  }
+}
+/* Compact reference keeps the probability list scannable during a hand. */
+.side-odds .odds-intro {
+  display: none;
+}
+.side-odds .odds-meta {
+  margin-top: 12px;
+  padding: 8px 10px;
+}
+.side-odds .odds-heading h2 {
+  font-size: 18px;
+}
+.side-odds .odds-rows {
+  margin-top: 6px;
+}
+.side-odds .odds-row {
+  padding: 3px 1px;
+  min-height: 32px;
+}
+.side-odds .odds-name {
+  gap: 2px;
+  row-gap: 0;
+}
+.side-odds .odds-name > b {
+  font-size: 12px;
+  line-height: 1.1;
+}
+.side-odds .example-cards {
+  margin-top: 1px;
+  gap: 2px;
+}
+.side-odds .example-cards span {
+  font-size: 8px;
+  line-height: 1;
+  min-width: 17px;
+  padding: 1px 2px;
+}
+.side-odds .probability-track {
+  display: none;
+}
+.side-odds .odds-chance {
+  width: 64px;
+}

@@ -1,5 +1,8 @@
 import type { GameSound } from "../shared/sound-events";
 const files = {
+  deal: ["card-slide-1"],
+  flip: ["card-place-1"],
+  shuffle: ["card-shuffle"],
   cards: ["card-slide-1", "card-place-1"],
   chips: ["chip-lay-1", "chips-collide-1", "chips-collide-2", "chips-stack-3"],
   payout: ["chips-handle-2", "chips-stack-1"],
@@ -82,7 +85,9 @@ export function createAudioPlayer() {
         gain = ctx.createGain();
       source.buffer = buffer;
       source.playbackRate.value = 0.95 + Math.random() * 0.1;
-      gain.gain.value = sound === "cards" ? 0.62 : 0.9;
+      gain.gain.value = ["cards", "deal", "flip", "shuffle"].includes(sound)
+        ? 0.62
+        : 0.9;
       source.connect(gain);
       gain.connect(output);
       source.start(start);

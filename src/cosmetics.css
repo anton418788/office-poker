@@ -136,10 +136,6 @@
   display: flex;
   flex-direction: column;
 }
-.inventory-item.item-equipped {
-  border-color: #83a36e;
-  box-shadow: 0 0 0 1px #83a36e;
-}
 .inventory-preview {
   position: relative;
   display: flex;
@@ -221,9 +217,6 @@
   background: #142c20;
   border-color: #33523d;
 }
-[data-theme="club"] .inventory-item.item-equipped {
-  border-color: #8fb979;
-}
 [data-theme="club"] .inventory-preview {
   background:
     radial-gradient(ellipse at 50% 90%, #496c4266, transparent 70%), #102218;
@@ -253,4 +246,16 @@
     padding: 10px;
     font-size: 13px;
   }
+}
+
+/* Rarity describes the item, regardless of ownership, selection or theme. */
+.inventory-item[data-rarity] {
+  border-color: var(--rarity-color);
+}
+.item-rarity {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  margin: -2px 0 10px;
 }

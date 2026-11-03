@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   cosmeticItems,
+  cosmeticRarities,
   type CosmeticSlot,
   type Inventory,
 } from "../shared/cosmetics";
@@ -92,6 +93,12 @@ export function InventoryPanel({
             return (
               <article
                 key={item.id}
+                data-rarity={item.rarity}
+                style={
+                  {
+                    "--rarity-color": cosmeticRarities[item.rarity].color,
+                  } as CSSProperties
+                }
                 className={`inventory-item ${!owned ? "item-locked" : ""} ${equipped ? "item-equipped" : ""}`}
               >
                 <div
@@ -122,6 +129,9 @@ export function InventoryPanel({
                   )}
                 </div>
                 <h2>{item.name}</h2>
+                <span className="item-rarity">
+                  {cosmeticRarities[item.rarity].name}
+                </span>
                 <p>{item.description}</p>
                 <button
                   className={owned && !equipped ? "primary" : ""}

@@ -281,7 +281,6 @@ test("Баланс сохраняется при проигрыше, выход�
       r.players.find((p: any) => p.id === b.user.id).cards.length,
       0,
     );
-    assert.equal((await s.call(a.cookie, `rooms/${id}/leave`, {})).status, 400);
     assert.equal(
       (
         await s.call(admin, `accounts/${a.user.id}`, {
@@ -1040,6 +1039,102 @@ test("Администратор уже владеет всеми предмет
     assert.equal(result.data.caseOpening.compensation, 500);
     assert.equal(result.data.account.balance, 2000);
     assert.equal(result.data.inventory.owned.length, 8);
+  } finally {
+    await s.close();
+  }
+});
+
+test("Выход в активной раздаче освобождает место, сохраняет ставки и баланс атомарно после перезапуска", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-leave-")),
+    path = pathJoin(dir, "game.sqlite");
+  let time = 1_800_000_000_000,
+    s = await open(path, () => time);
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "leaving_a"),
+      b = await s.add(admin, "leaving_b"),
+      c = await s.add(admin, "leaving_c"),
+      room = await s.create(a.cookie),
+      id = room.room.id;
+    await s.call(b.cookie, `rooms/${id}/join`, {});
+    await s.call(c.cookie, `rooms/${id}/join`, {});
+    let g = (await s.call(a.cookie, `rooms/${id}/start`, {})).data.room;
+    time = g.deal.endsAt + 1;
+    // The small blind leaves out of turn; their ten chips remain in the bank.
+    const result = await s.call(b.cookie, `rooms/${id}/leave`, {});
+    assert.equal(result.status, 200);
+    g = result.data.room;
+    assert.equal(result.data.account.balance, 1990);
+    assert.equal(result.data.activeRoom, undefined);
+    assert.equal(
+      g.players.some((p: any) => p.id === b.user.id),
+      false,
+    );
+    assert.equal(g.departedBets[0].total, 10);
+    assert.equal(g.actor, a.user.id);
+    assert.equal((await s.call(b.cookie, `rooms/${id}/leave`, {})).status, 400);
+    await s.close();
+    s = await open(path, () => time);
+    g = (await s.call(a.cookie, `rooms/${id}`)).data.room;
+    assert.equal(g.departedBets[0].total, 10);
+    assert.equal((await s.call(b.cookie, "state")).data.account.balance, 1990);
+    const reseated = await s.call(b.cookie, `rooms/${id}/join`, { seat: 1 });
+    assert.equal(reseated.status, 200);
+    assert.equal(
+      reseated.data.room.players.find((p: any) => p.id === b.user.id).cards
+        .length,
+      0,
+    );
+    assert.equal(
+      reseated.data.room.players.find((p: any) => p.id === b.user.id).folded,
+      true,
+    );
+    const final = await s.call(a.cookie, `rooms/${id}/leave`, {});
+    assert.equal(final.status, 200);
+    assert.equal(final.data.room.phase, "showdown");
+    const funds =
+      final.data.room.players.reduce(
+        (sum: number, p: any) => sum + p.chips,
+        0,
+      ) + final.data.account.balance;
+    assert.equal(funds, 6000);
+    assert.equal(
+      final.data.room.lastResult.winners.some(
+        (w: any) => w.id === b.user.id || w.id === a.user.id,
+      ),
+      false,
+    );
+    assert.equal(final.data.room.room.hostId, b.user.id);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("Выйти можно во время раздачи карт и на паузе; чужие команды по-прежнему закрыты", async () => {
+  let time = 1_800_000_000_000;
+  const s = await open(":memory:", () => time);
+  try {
+    const admin = await s.setup(),
+      a = await s.add(admin, "exit_player"),
+      b = await s.add(admin, "exit_watcher"),
+      room = await s.create(a.cookie),
+      id = room.room.id;
+    await s.call(a.cookie, `rooms/${id}/bot`, { seat: 1 });
+    await s.call(a.cookie, `rooms/${id}/bot`, { seat: 2 });
+    await s.call(a.cookie, `rooms/${id}/start`, {});
+    await s.call(a.cookie, `rooms/${id}/pause`, {});
+    assert.equal((await s.call(b.cookie, `rooms/${id}/leave`, {})).status, 400);
+    const left = await s.call(a.cookie, `rooms/${id}/leave`, {});
+    assert.equal(left.status, 200);
+    assert.equal(left.data.room.paused, true);
+    assert.equal(left.data.room.deadline, null);
+    assert.ok(
+      left.data.room.players.find((p: any) => p.id === left.data.room.actor)
+        ?.bot,
+    );
+    assert.equal(left.data.account.balance, 2000);
+    assert.equal(left.data.activeRoom, undefined);
   } finally {
     await s.close();
   }

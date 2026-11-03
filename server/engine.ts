@@ -139,6 +139,7 @@ export function start(g: Game, now = Date.now(), animate = false) {
   g.cardBack = normalizeAppearance(
     players.find((p) => p.seat === g.dealer)?.appearance,
   ).deck;
+  g.departedBets = [];
   g.deck = deck();
   g.board = [];
   g.result = [];
@@ -175,20 +176,27 @@ export function start(g: Game, now = Date.now(), animate = false) {
 }
 export function settle(g: Game) {
   const candidates = live(g);
+  const participants = [...g.players, ...(g.departedBets ?? [])];
   const levels = [
-    ...new Set(g.players.map((p) => p.total).filter(Boolean)),
+    ...new Set(participants.map((p) => p.total).filter(Boolean)),
   ].sort((a, b) => a - b);
   let previous = 0;
   const gains = new Map<string, number>();
   const winningIds = new Set<string>();
   for (const level of levels) {
-    const contributors = g.players.filter((p) => p.total >= level);
+    const contributors = participants.filter((p) => p.total >= level);
     const pot = (level - previous) * contributors.length;
     previous = level;
     let eligible =
       candidates.length === 1
         ? candidates
         : candidates.filter((p) => p.total >= level);
+    // Dead money above the live players' commitments belongs to the remaining
+    // participants with the greatest contribution, never to a departed hand.
+    if (!eligible.length && candidates.length) {
+      const highest = Math.max(...candidates.map((p) => p.total));
+      eligible = candidates.filter((p) => p.total === highest);
+    }
     if (!eligible.length) throw Error("Invalid pot");
     if (candidates.length > 1) {
       const scores = eligible.map((p) => ({
@@ -258,6 +266,7 @@ export function settle(g: Game) {
     p.bet = 0;
     p.total = 0;
   });
+  g.departedBets = [];
 }
 function advance(g: Game, seat: number, now: number) {
   if (live(g).length === 1) {
@@ -288,6 +297,7 @@ function advance(g: Game, seat: number, now: number) {
   g.minRaise = Math.max(g.settings.big, g.settings.step ?? 1);
   g.acted = [];
   g.players.forEach((p) => (p.bet = 0));
+  g.departedBets?.forEach((p) => (p.bet = 0));
   log(
     g,
     `Открыт ${g.phase === "flop" ? "флоп" : g.phase === "turn" ? "тёрн" : "ривер"}`,
@@ -358,6 +368,84 @@ export function action(
   if (!g.acted.includes(id)) g.acted.push(id);
   advance(g, p.seat, now);
   present(g, false, boardFrom, now);
+}
+/** Leave immediately; retain contributions as dead money without reserving a seat. */
+export function leave(g: Game, id: string, now = Date.now()): Player {
+  const player = g.players.find((p) => p.id === id);
+  if (!player) throw Error("Вы не сидите за этим столом");
+  const active = running(g),
+    oldActor = g.actor,
+    boardFrom = g.board.length;
+  const oldDeal = g.deal?.id,
+    oldRemaining = g.remaining;
+  if (active && player.cards.length && !player.folded) {
+    const others = [
+      ...g.players.filter((p) => p.id !== id),
+      ...(g.departedBets ?? []),
+    ];
+    const uncalled = Math.max(
+      0,
+      player.total - Math.max(0, ...others.map((p) => p.total)),
+    );
+    if (uncalled) {
+      player.chips += uncalled;
+      player.total -= uncalled;
+      player.bet = Math.max(0, player.bet - uncalled);
+      log(g, `${player.name}: возврат неуравненной ставки ${uncalled}`);
+    }
+    player.folded = true;
+    player.lastAction = { kind: "fold", hand: g.hand };
+    log(g, `${player.name}: фолд при выходе`);
+  }
+  if (active && player.total > 0)
+    g.departedBets = [
+      ...(g.departedBets ?? []),
+      {
+        id: player.id,
+        seat: player.seat,
+        bet: player.bet,
+        total: player.total,
+      },
+    ];
+  g.players = g.players.filter((p) => p.id !== id);
+  g.acted = g.acted.filter((actor) => actor !== id);
+  if (active) {
+    const oldBet = g.currentBet;
+    g.currentBet = Math.min(
+      g.currentBet,
+      Math.max(
+        0,
+        ...g.players.map((p) => p.bet),
+        ...(g.departedBets ?? []).map((p) => p.bet),
+      ),
+    );
+    if (g.currentBet < oldBet)
+      g.minRaise = Math.max(g.settings.big, g.settings.step ?? 1);
+    if (
+      oldActor === id ||
+      live(g).length <= 1 ||
+      (able(g).length <= 1 && able(g).every((p) => p.bet >= g.currentBet))
+    )
+      advance(g, player.seat, now);
+    present(g, false, boardFrom, now);
+    if (g.paused) {
+      if (g.deal && g.deal.id !== oldDeal) g.deal.pausedAt = now;
+      g.deadline = null;
+      g.remaining = !g.actor
+        ? 0
+        : oldActor !== g.actor || g.deal?.id !== oldDeal
+          ? g.settings.minutes * 60_000 +
+            Math.max(0, (g.deal?.endsAt ?? now) - (g.deal?.pausedAt ?? now))
+          : oldRemaining;
+    } else if (g.actor && isDealing(g, now)) {
+      g.deadline = Math.max(
+        g.deadline ?? now,
+        g.deal!.endsAt + g.settings.minutes * 60_000,
+      );
+    }
+  }
+  log(g, `${player.name} вышел из-за стола`);
+  return player;
 }
 export function tick(g: Game, now = Date.now()) {
   if (

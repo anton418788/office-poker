@@ -57,6 +57,7 @@ export type HandResult = {
   previousWinnerIds: string[];
 };
 export type Game = {
+  departedBets?: { id: string; seat: number; bet: number; total: number }[];
   cardBack?: string;
   lastResult?: HandResult;
   checkSeq?: number;

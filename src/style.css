@@ -1868,9 +1868,6 @@ h1 {
 .empty-seat .seat-number {
   color: #f0f4e0;
 }
-.table-scene:has(.seat-3.occupied) .table-wordmark {
-  opacity: 0.15;
-}
 .flying-chip > .poker-chip {
   animation: chip-spin 0.85s ease-out both;
 }
@@ -2628,4 +2625,47 @@ h1 {
 
 .acting .player-action {
   top: calc(100% + 30px);
+}
+
+/* Reserve the upper rail for seat four; keep the club mark clear below it. */
+.table-wordmark {
+  top: 40px;
+}
+.seat-3 .player-action,
+.seat-3 .seat-info {
+  top: 65%;
+  left: calc(100% + 6px);
+  transform: none;
+}
+.leave-table-link {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  box-shadow: none;
+}
+.leave-table-link:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+  transform: none;
+  box-shadow: none;
+}
+@media (max-width: 560px) {
+  .leave-table-link {
+    font-size: 10px;
+    margin-top: 7px;
+  }
+  .seat-3 .player-action,
+  .seat-3 .seat-info {
+    left: calc(100% + 3px);
+    max-width: 100px;
+    font-size: 9px;
+  }
 }

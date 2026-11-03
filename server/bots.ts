@@ -1,3 +1,4 @@
+import { potAmount } from "../shared/pot.js";
 import { randomUUID } from "node:crypto";
 import { isDealing } from "../shared/dealing.js";
 import type { Card, Game, View } from "../shared/types.js";
@@ -57,7 +58,7 @@ export function decide(
   random = Math.random,
 ): { kind: "check" | "call" | "fold" | "raise"; amount?: number } {
   const chance = equity(v, random);
-  const pot = v.players.reduce((sum, p) => sum + p.total, 0);
+  const pot = potAmount(v);
   const odds = v.legal.call / Math.max(1, pot + v.legal.call);
   if (v.legal.call > 0 && chance + 0.06 < odds && random() > 0.08)
     return { kind: "fold" };

@@ -21,6 +21,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createGame,
   join,
+  leave,
   start,
   action,
   pause,
@@ -221,12 +222,17 @@ export function createApp(
           (presence.get(room.id)?.get(p.id) ?? -Infinity) > now() - PRESENCE_MS,
       )
       .map((p) => p.id);
-  const saveRoom = (room: Room) => {
+  const saveRoom = (room: Room, withdrawn?: { id: string; chips: number }) => {
     transaction(() => {
       db.prepare("INSERT OR REPLACE INTO rooms VALUES(?,?)").run(
         room.id,
         JSON.stringify(room),
       );
+      if (withdrawn)
+        db.prepare("UPDATE users SET balance=? WHERE id=?").run(
+          withdrawn.chips,
+          withdrawn.id,
+        );
       for (const p of room.game.players.filter((p) => !p.bot))
         db.prepare("UPDATE users SET balance=? WHERE id=?").run(p.chips, p.id);
     });
@@ -649,8 +655,9 @@ export function createApp(
       !u.admin
     )
       fail("Управление доступно хосту стола", 403);
+    let withdrawn: { id: string; chips: number } | undefined;
     if (
-      ["bot", "settings", "remove", "leave"].includes(command) &&
+      ["bot", "settings", "remove"].includes(command) &&
       (running(g) || isDealing(g, now()))
     )
       fail("Это доступно между раздачами");
@@ -683,7 +690,7 @@ export function createApp(
         break;
       }
       case "leave": {
-        g.players = g.players.filter((p) => p.id !== u.id);
+        withdrawn = leave(g, u.id, now());
         presence.get(room.id)?.delete(u.id);
         if (room.hostId === u.id) {
           room.hostId = g.players.find((p) => !p.bot)?.id ?? u.id;
@@ -704,7 +711,7 @@ export function createApp(
     }
     if (onlineIds(room).length === 0 && room.emptySince === null)
       room.emptySince = now();
-    saveRoom(room);
+    saveRoom(room, withdrawn);
     touch(room, u.id);
     res.json(state(res, room));
   });

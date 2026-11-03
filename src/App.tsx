@@ -1,3 +1,4 @@
+import { potAmount } from "../shared/pot";
 import { useEffect, useState } from "react";
 import type { Account, View } from "../shared/types";
 import "./style.css";
@@ -328,6 +329,18 @@ export function GameScreen({
                               ? "Можно спокойно работать"
                               : "Готовы к новой раздаче"}
                   </span>
+                  <button
+                    className="leave-table-link"
+                    disabled={busy}
+                    onClick={() => send("leave")}
+                    title={
+                      inHand
+                        ? "Сбросить карты и выйти. Уравненные ставки останутся в банке."
+                        : "Освободить место и сохранить баланс"
+                    }
+                  >
+                    Выйти из-за стола
+                  </button>
                 </div>
               </div>
               {inHand ? (
@@ -374,18 +387,11 @@ export function GameScreen({
                           label: "½ банка",
                           value:
                             g.currentBet +
-                            Math.round(
-                              (g.players.reduce((n, p) => n + p.total, 0) +
-                                g.legal.call) *
-                                0.5,
-                            ),
+                            Math.round((potAmount(g) + g.legal.call) * 0.5),
                         },
                         {
                           label: "Банк",
-                          value:
-                            g.currentBet +
-                            g.players.reduce((n, p) => n + p.total, 0) +
-                            g.legal.call,
+                          value: g.currentBet + potAmount(g) + g.legal.call,
                         },
                         { label: "Олл-ин", value: g.legal.max },
                       ].map((preset) => (
@@ -456,12 +462,6 @@ export function GameScreen({
                 </div>
               ) : (
                 <div className="action-buttons">
-                  <button
-                    disabled={busy || presentation.active}
-                    onClick={() => send("leave")}
-                  >
-                    Покинуть стол
-                  </button>
                   {g.canManage && (
                     <button
                       className="primary"

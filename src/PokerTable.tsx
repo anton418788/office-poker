@@ -1,3 +1,4 @@
+import { potAmount } from "../shared/pot";
 import { normalizeAppearance, defaultAppearance } from "../shared/cosmetics";
 import {
   useEffect,
@@ -19,7 +20,7 @@ const locations = [
   [50, 79],
   [10, 68],
   [10, 29],
-  [50, 17],
+  [50, 7],
   [90, 29],
   [90, 68],
 ];
@@ -143,7 +144,7 @@ export function PokerTable({
     );
     return () => clearTimeout(timer);
   }, [g.paused, flights]);
-  const pot = g.players.reduce((n, p) => n + p.total, 0);
+  const pot = potAmount(g);
   const crowns = crownWinners(g, presentation.active);
   const shownResult =
     g.phase === "showdown" &&
@@ -406,44 +407,50 @@ export function PokerTable({
           </div>
         )}
         <div className="card-flights" aria-hidden="true">
-          {presentation.flights.map((move) => {
-            const anchor =
-              anchors[
-                move.kind === "hole"
-                  ? `seat-${move.seat}`
-                  : `board-${move.index}`
-              ];
-            const target = anchor
-              ? [...anchor]
-              : move.kind === "hole"
-                ? point(move.seat)
-                : [50 + (move.index - 2) * 6.3, 58];
-            if (move.kind === "hole") {
-              if (anchor)
-                target[0] +=
-                  (((move.index - 0.5) * (compact ? 34 : 41)) /
-                    (sceneSize.width || 800)) *
-                  100;
-              else {
-                target[0] += (move.index - 0.5) * 4;
-                target[1] -= 11;
-              }
-            }
-            return (
-              <CardFlight
-                key={move.key}
-                move={move}
-                cardBack={cardBack}
-                from={origin}
-                to={target}
-                width={sceneSize.width}
-                height={sceneSize.height}
-                pausedAt={
-                  g.paused ? (g.deal?.pausedAt ?? Date.now()) : undefined
+          {presentation.flights
+            .filter(
+              (move) =>
+                move.kind !== "hole" ||
+                g.players.some((p) => p.seat === move.seat && !p.folded),
+            )
+            .map((move) => {
+              const anchor =
+                anchors[
+                  move.kind === "hole"
+                    ? `seat-${move.seat}`
+                    : `board-${move.index}`
+                ];
+              const target = anchor
+                ? [...anchor]
+                : move.kind === "hole"
+                  ? point(move.seat)
+                  : [50 + (move.index - 2) * 6.3, 58];
+              if (move.kind === "hole") {
+                if (anchor)
+                  target[0] +=
+                    (((move.index - 0.5) * (compact ? 34 : 41)) /
+                      (sceneSize.width || 800)) *
+                    100;
+                else {
+                  target[0] += (move.index - 0.5) * 4;
+                  target[1] -= 11;
                 }
-              />
-            );
-          })}
+              }
+              return (
+                <CardFlight
+                  key={move.key}
+                  move={move}
+                  cardBack={cardBack}
+                  from={origin}
+                  to={target}
+                  width={sceneSize.width}
+                  height={sceneSize.height}
+                  pausedAt={
+                    g.paused ? (g.deal?.pausedAt ?? Date.now()) : undefined
+                  }
+                />
+              );
+            })}
         </div>
         <div className="chip-flights" aria-hidden="true">
           {flights.flatMap((flight) => {

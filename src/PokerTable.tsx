@@ -1,4 +1,5 @@
 import { ParticipantMenu } from "./ParticipantMenu";
+import { ReactionPicker, ReactionBubble } from "./TableReactions";
 import {
   tableLocations,
   seatAtView,
@@ -331,6 +332,27 @@ export function PokerTable({
                     ) : null}
                   </div>
                   <div className="player">
+                    {p.id === g.me && (
+                      <ReactionPicker
+                        busy={participantBusy}
+                        lastSent={
+                          g.reactions?.find((r) => r.playerId === p.id)
+                            ?.createdAt ?? 0
+                        }
+                        onSend={async (reaction) => {
+                          await send("reaction", { reaction });
+                        }}
+                      />
+                    )}
+                    {g.reactions
+                      ?.filter((r) => r.playerId === p.id)
+                      .map((event) => (
+                        <ReactionBubble
+                          key={event.id}
+                          event={event}
+                          name={p.name}
+                        />
+                      ))}
                     <ParticipantMenu
                       name={p.name}
                       playerId={p.id}

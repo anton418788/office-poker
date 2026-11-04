@@ -160,11 +160,6 @@ export function GameScreen({
             ⚙ <span>Аккаунты игроков</span>
           </button>
         )}
-        <div className="soon">
-          <span>Скоро в клубе</span>
-          <p>☺ Реакции за столом</p>
-          <small>Сначала — хорошая партия.</small>
-        </div>
         <div className="sidebar-bottom">
           <span className="status-dot" /> Только игровые фишки
           <br />

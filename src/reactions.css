@@ -1,0 +1,249 @@
+.reaction-control {
+  position: absolute;
+  left: 39px;
+  top: 39px;
+  z-index: 12;
+}
+.reaction-trigger {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #82926d;
+  background: #e8e9d4;
+  color: #3b5942;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 2px 5px #0002;
+}
+.reaction-trigger:hover:not(:disabled),
+.reaction-trigger[aria-expanded="true"] {
+  background: #d5e5b0;
+  transform: none;
+}
+.reaction-options {
+  position: absolute;
+  bottom: 29px;
+  left: -45px;
+  width: 240px;
+  padding: 14px;
+  border: 1px solid #82926d;
+  border-radius: 16px;
+  background: #fffdf0;
+  box-shadow: 0 10px 30px #0003;
+  color: #344d3c;
+  text-align: left;
+}
+.player .reaction-control .reaction-options > span {
+  color: inherit;
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+.reaction-options > div {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+.reaction-options button {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  height: 37px;
+  width: 37px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 25px;
+  line-height: 1;
+}
+.reaction-options button:hover:not(:disabled) {
+  background: #dfe8cb;
+  border-color: #a9ba89;
+  transform: translateY(-2px) scale(1.08);
+}
+.reaction-options > small {
+  display: block;
+  font-size: 10px;
+  margin-top: 11px;
+  color: #78836d;
+}
+.seat:has(.reaction-options) {
+  z-index: 14;
+}
+.reaction-bubble {
+  position: absolute;
+  left: -59px;
+  top: -21px;
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 10;
+  border: 1px solid #c7b77b88;
+  border-radius: 24px 24px 8px 24px;
+  background: radial-gradient(circle at 35% 25%, #fffdf3, #e6e4ca);
+  box-shadow: 0 6px 18px #07170f38;
+  animation: reaction-lifetime 4.6s both;
+}
+.seat-1 .reaction-bubble,
+.seat-2 .reaction-bubble {
+  left: auto;
+  right: -59px;
+  border-radius: 24px 24px 24px 8px;
+}
+.player .reaction-bubble > .reaction-glyph {
+  display: block;
+  font-size: 40px;
+  line-height: 1;
+  margin: 0;
+  filter: drop-shadow(0 3px 1px #3f452218);
+  animation: reaction-wiggle 1.2s ease-in-out infinite;
+}
+.reaction-bubble.reaction-cool > .reaction-glyph,
+.reaction-bubble.reaction-fire > .reaction-glyph {
+  animation: reaction-pulse 0.9s ease-in-out infinite;
+}
+.reaction-bubble.reaction-applause > .reaction-glyph {
+  animation: reaction-clap 0.55s ease-in-out infinite;
+}
+.reaction-bubble i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+  background: #dec476;
+  animation: reaction-sparkle 1.3s ease-out infinite;
+}
+.reaction-bubble i:nth-of-type(1) {
+  left: 4px;
+  top: 8px;
+}
+.reaction-bubble i:nth-of-type(2) {
+  right: 3px;
+  top: 23px;
+  animation-delay: 0.35s;
+}
+.reaction-bubble i:nth-of-type(3) {
+  right: 13px;
+  bottom: 4px;
+  animation-delay: 0.7s;
+}
+[data-theme="club"] .reaction-trigger {
+  background: #354d3b;
+  color: #e4d6a2;
+  border-color: #8a9667;
+}
+[data-theme="club"] .reaction-options {
+  background: #1b3426;
+  border-color: #66835a;
+  color: #e5e4cf;
+}
+[data-theme="club"] .reaction-options button:hover:not(:disabled) {
+  background: #34523c;
+  border-color: #819665;
+}
+[data-theme="club"] .reaction-options > small {
+  color: #a4b29b;
+}
+[data-theme="club"] .reaction-bubble {
+  background: radial-gradient(circle at 35% 25%, #3d5940, #213b2a);
+  border-color: #a38e5b;
+}
+@keyframes reaction-lifetime {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.4) rotate(-12deg);
+  }
+  9% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.12) rotate(3deg);
+  }
+  16%,
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-22px) scale(0.85);
+  }
+}
+@keyframes reaction-wiggle {
+  0%,
+  100% {
+    transform: rotate(-9deg) translateY(1px);
+  }
+  50% {
+    transform: rotate(9deg) translateY(-4px);
+  }
+}
+@keyframes reaction-pulse {
+  0%,
+  100% {
+    transform: scale(0.95) translateY(1px);
+  }
+  50% {
+    transform: scale(1.13) translateY(-3px);
+  }
+}
+@keyframes reaction-clap {
+  0%,
+  100% {
+    transform: rotate(-12deg) scale(0.95);
+  }
+  50% {
+    transform: rotate(8deg) scale(1.15);
+  }
+}
+@keyframes reaction-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4) translateY(3px) rotate(0);
+  }
+  45% {
+    opacity: 0.9;
+    transform: scale(1.2) translateY(-5px) rotate(90deg);
+  }
+}
+@container (max-width:650px) {
+  .reaction-control {
+    left: 25px;
+    top: 30px;
+  }
+  .reaction-bubble {
+    width: 52px;
+    height: 52px;
+    left: -44px;
+    top: -14px;
+    border-radius: 18px;
+  }
+  .player .reaction-bubble > .reaction-glyph {
+    font-size: 32px;
+  }
+  .seat-1 .reaction-bubble,
+  .seat-2 .reaction-bubble {
+    right: -44px;
+    left: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-bubble,
+  .player .reaction-bubble > .reaction-glyph,
+  .reaction-bubble i {
+    animation: none;
+  }
+  .reaction-bubble i {
+    display: none;
+  }
+  .reaction-options button:hover:not(:disabled) {
+    transform: none;
+  }
+}

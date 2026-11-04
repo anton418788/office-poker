@@ -1,6 +1,7 @@
 import type { CaseOpening } from "./cases";
 import type { Appearance, Inventory } from "./cosmetics";
 import type { HandCombination, PlayerProfile, ProfileGift } from "./profile";
+import type { TableReaction } from "./reactions";
 export type Card = { rank: number; suit: "s" | "h" | "d" | "c" };
 export type Player = {
   id: string;
@@ -63,6 +64,7 @@ export type HandResult = {
   previousWinnerIds: string[];
 };
 export type Game = {
+  reactions?: TableReaction[];
   handParticipants?: string[];
   departedBets?: { id: string; seat: number; bet: number; total: number }[];
   cardBack?: string;

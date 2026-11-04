@@ -9,8 +9,128 @@ import { tmpdir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { tokenHash } from "../server/accounts.js";
 import { cosmeticItems } from "../shared/cosmetics.js";
+import {
+  tableReactions,
+  REACTION_DURATION,
+  REACTION_COOLDOWN,
+} from "../shared/reactions.js";
 const password = "test-password-123";
 const rules = { small: 10, big: 20, minutes: 10, step: 10 };
+test("Эмоции: видны всем, только от сидящего отправителя, с паузой и без влияния на раздачу", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-reactions-")),
+    path = pathJoin(dir, "game.sqlite");
+  let now = Date.now(),
+    s = await open(path, () => now);
+  try {
+    const admin = await s.setup(),
+      host = await s.add(admin, "reaction_host"),
+      guest = await s.add(admin, "reaction_guest");
+    const room = await s.create(host.cookie),
+      id = room.room.id;
+    await s.call(guest.cookie, `rooms/${id}/join`, { seat: 1 });
+    assert.equal(
+      (await s.call(admin, `rooms/${id}/reaction`, { reaction: "smile" }))
+        .status,
+      403,
+    );
+    assert.equal(
+      (await s.call("", `rooms/${id}/reaction`, { reaction: "smile" })).status,
+      401,
+    );
+    assert.equal(
+      (
+        await s.call(host.cookie, `rooms/${id}/reaction`, {
+          reaction: "unknown",
+        })
+      ).status,
+      400,
+    );
+    const sent = await s.call(host.cookie, `rooms/${id}/reaction`, {
+      reaction: "fire",
+      playerId: guest.user.id,
+    });
+    assert.equal(sent.status, 200);
+    const event = sent.data.room.reactions[0];
+    assert.equal(event.playerId, host.user.id);
+    assert.equal(event.reaction, "fire");
+    assert.equal(event.expiresAt - event.createdAt, REACTION_DURATION);
+    assert.deepEqual(
+      (await s.call(guest.cookie, `rooms/${id}`)).data.room.reactions,
+      [event],
+    );
+    assert.deepEqual((await s.call(admin, `rooms/${id}`)).data.room.reactions, [
+      event,
+    ]);
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}/reaction`, { reaction: "laugh" }))
+        .status,
+      429,
+    );
+    assert.equal(
+      (
+        await s.call(guest.cookie, `rooms/${id}/reaction`, {
+          reaction: "applause",
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}`)).data.room.reactions.length,
+      2,
+    );
+    await s.call(host.cookie, `rooms/${id}/start`, {});
+    await s.call(host.cookie, `rooms/${id}/pause`, {});
+    const before = (await s.call(host.cookie, `rooms/${id}`)).data;
+    now += REACTION_COOLDOWN;
+    const reply = await s.call(host.cookie, `rooms/${id}/reaction`, {
+      reaction: "laugh",
+    });
+    assert.equal(reply.status, 200);
+    const { reactions: beforeReactions, ...oldGame } = before.room,
+      { reactions: afterReactions, ...newGame } = reply.data.room;
+    assert.deepEqual(newGame, oldGame);
+    assert.equal(reply.data.account.balance, before.account.balance);
+    assert.equal(
+      afterReactions.filter((r: any) => r.playerId === host.user.id).length,
+      1,
+    );
+    const newest = afterReactions.find((r: any) => r.playerId === host.user.id);
+    await s.close();
+    s = await open(path, () => now);
+    assert.equal(
+      (await s.call(guest.cookie, `rooms/${id}`)).data.room.reactions.find(
+        (r: any) => r.playerId === host.user.id,
+      ).id,
+      newest.id,
+    );
+    now += REACTION_DURATION + 1;
+    assert.equal(
+      (await s.call(guest.cookie, `rooms/${id}`)).data.room.reactions.length,
+      0,
+    );
+    for (const reaction of tableReactions) {
+      now += REACTION_COOLDOWN;
+      const r = await s.call(host.cookie, `rooms/${id}/reaction`, {
+        reaction: reaction.id,
+      });
+      assert.equal(r.status, 200);
+      assert.equal(r.data.room.reactions.length, 1);
+    }
+    await s.call(host.cookie, `rooms/${id}/leave`, {});
+    assert.equal(
+      (await s.call(guest.cookie, `rooms/${id}`)).data.room.reactions.length,
+      0,
+    );
+    assert.equal(
+      (await s.call(host.cookie, `rooms/${id}/reaction`, { reaction: "smile" }))
+        .status,
+      403,
+    );
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
 test("Профиль через API: завершение раздачи, сохранение, запрет чужого подарка и идемпотентное открытие", async () => {
   const dir = mkdtempSync(pathJoin(tmpdir(), "poker-profile-api-")),
     path = pathJoin(dir, "game.sqlite");

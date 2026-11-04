@@ -33,6 +33,11 @@ import { addBot, step } from "./bots.js";
 import { isDealing } from "../shared/dealing.js";
 import { createProfiles } from "./profiles.js";
 import {
+  tableReactions,
+  REACTION_DURATION,
+  REACTION_COOLDOWN,
+} from "../shared/reactions.js";
+import {
   chipsAmount,
   displayName,
   loginName,
@@ -327,6 +332,11 @@ export function createApp(
   };
   const roomView = (room: Room, u: UserRow) => ({
     ...view(room.game, u.id, !!u.admin),
+    reactions: (room.game.reactions ?? []).filter(
+      (event) =>
+        event.expiresAt > now() &&
+        room.game.players.some((p) => p.id === event.playerId),
+    ),
     room: {
       id: room.id,
       name: room.name,
@@ -731,6 +741,32 @@ export function createApp(
     )
       fail("Это доступно между раздачами");
     switch (command) {
+      case "reaction": {
+        if (!g.players.some((p) => p.id === u.id && !p.bot))
+          fail("Отправлять эмоции можно, сидя за столом", 403);
+        const reaction = tableReactions.find((r) => r.id === b.reaction);
+        if (!reaction) fail("Неизвестная эмоция");
+        const at = now(),
+          previous = g.reactions?.find((r) => r.playerId === u.id);
+        if (previous && at - previous.createdAt < REACTION_COOLDOWN)
+          fail("Подождите пару секунд перед следующей эмоцией", 429);
+        g.reactions = [
+          ...(g.reactions ?? []).filter(
+            (r) =>
+              r.playerId !== u.id &&
+              r.expiresAt > at &&
+              g.players.some((p) => p.id === r.playerId),
+          ),
+          {
+            id: randomUUID(),
+            playerId: u.id,
+            reaction: reaction.id,
+            createdAt: at,
+            expiresAt: at + REACTION_DURATION,
+          },
+        ];
+        break;
+      }
       case "join": {
         const current = occupied(u.id);
         if (current) fail("Вы уже сидите за столом. Сначала покиньте его.");

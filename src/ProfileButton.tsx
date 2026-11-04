@@ -1,12 +1,15 @@
 import { WinnerCrown } from "./WinnerCrown";
+import { AvatarContent } from "./AvatarContent";
 export function ProfileButton({
   name,
+  avatarUrl,
   count,
   onClick,
   winner = false,
   active = false,
 }: {
   name?: string;
+  avatarUrl?: string | null;
   count: number;
   onClick: () => void;
   winner?: boolean;
@@ -22,7 +25,7 @@ export function ProfileButton({
       disabled={active}
     >
       <span className="profile-access-avatar" aria-hidden="true">
-        {name?.slice(0, 1).toUpperCase() || "♙"}
+        <AvatarContent name={name || "♙"} url={avatarUrl} />
         {winner && <WinnerCrown />}
         {count > 0 && <span className="gift-count">{count}</span>}
       </span>

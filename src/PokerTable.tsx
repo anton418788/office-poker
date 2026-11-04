@@ -1,4 +1,5 @@
 import { ParticipantMenu } from "./ParticipantMenu";
+import { AvatarContent } from "./AvatarContent";
 import { ReactionPicker, ReactionBubble } from "./TableReactions";
 import {
   tableLocations,
@@ -373,7 +374,11 @@ export function PokerTable({
                       onClick={p.bot ? undefined : () => onPlayerProfile(p.id)}
                     >
                       <span className={`avatar color-${seat}`}>
-                        {p.bot ? "🤖" : p.name.slice(0, 1).toUpperCase()}
+                        <AvatarContent
+                          name={p.name}
+                          url={p.avatarUrl}
+                          fallback={p.bot ? "🤖" : undefined}
+                        />
                         {crowns.includes(p.id) && <WinnerCrown />}
                       </span>
                       <div>

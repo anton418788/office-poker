@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PublicPlayerProfile } from "../shared/profile";
 import { profileCombinations } from "../shared/profile";
 import { ProfileOverview, CombinationTable } from "./ProfileOverview";
+import { AvatarContent } from "./AvatarContent";
 
 type Reader = (path: string) => Promise<PublicPlayerProfile>;
 function usePublicProfile(id: string, request: Reader) {
@@ -217,7 +218,10 @@ export function MiniProfile({
         <>
           <div className="mini-profile-heading">
             <span className="profile-portrait" aria-hidden="true">
-              {data.player.name.slice(0, 1).toUpperCase()}
+              <AvatarContent
+                name={data.player.name}
+                url={data.player.avatarUrl}
+              />
             </span>
             <div>
               <h2>{data.player.name}</h2>

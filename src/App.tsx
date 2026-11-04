@@ -221,6 +221,7 @@ export function GameScreen({
               <span>{sound.enabled ? "Звук вкл." : "Без звука"}</span>
             </button>
             <ProfileButton
+              avatarUrl={account.avatarUrl}
               name={account.name}
               count={giftCount}
               onClick={onProfile}

@@ -6,6 +6,7 @@ import { cosmeticItem, cosmeticRarities } from "../shared/cosmetics";
 import { isDealing } from "../shared/dealing";
 import { CosmeticPreview } from "./CosmeticPreview";
 import { ProfileOverview, CombinationTable } from "./ProfileOverview";
+import { AvatarUpload } from "./AvatarUpload";
 const format = (n: number) => n.toLocaleString("ru-RU");
 const giftNames = {
   rare: "Редкий подарок",
@@ -21,6 +22,8 @@ export function ProfilePanel({
   onBack,
   onInventory,
   onOpen,
+  onUploadAvatar,
+  onRemoveAvatar,
 }: {
   account: Account;
   profile: PlayerProfile;
@@ -30,6 +33,8 @@ export function ProfilePanel({
   onBack: () => void;
   onInventory: () => void;
   onOpen: (id: string) => Promise<ProfileGift | null>;
+  onUploadAvatar: (file: File) => Promise<boolean>;
+  onRemoveAvatar: () => Promise<boolean>;
 }) {
   const [tab, setTab] = useState<"stats" | "gifts">("stats"),
     [opened, setOpened] = useState<ProfileGift | null>(null);
@@ -54,6 +59,15 @@ export function ProfilePanel({
         </div>
       )}
       <ProfileOverview
+        portrait={
+          <AvatarUpload
+            name={account.name}
+            url={account.avatarUrl}
+            busy={busy}
+            onUpload={onUploadAvatar}
+            onRemove={onRemoveAvatar}
+          />
+        }
         account={account}
         profile={profile}
         onInventory={onInventory}

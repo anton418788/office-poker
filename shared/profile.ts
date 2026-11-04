@@ -58,5 +58,11 @@ export type PublicPlayerProfile = Pick<
   PlayerProfile,
   "hands" | "wins" | "showdowns" | "combinations" | "collection"
 > & {
-  player: { id: string; name: string; balance: number; admin: boolean };
+  player: {
+    id: string;
+    name: string;
+    balance: number;
+    admin: boolean;
+    avatarUrl?: string | null;
+  };
 };

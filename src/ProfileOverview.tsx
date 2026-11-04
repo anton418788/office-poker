@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { AvatarContent } from "./AvatarContent";
 import type { Account } from "../shared/types";
 import type { PublicPlayerProfile } from "../shared/profile";
 import { profileCombinations } from "../shared/profile";
@@ -8,22 +9,27 @@ export function ProfileOverview({
   account,
   profile,
   onInventory,
+  portrait,
 }: {
   account: Pick<Account, "name" | "balance" | "admin"> & {
     login?: string | null;
+    avatarUrl?: string | null;
   };
   profile: Pick<
     PublicPlayerProfile,
     "hands" | "wins" | "showdowns" | "collection"
   >;
   onInventory?: () => void;
+  portrait?: ReactNode;
 }) {
   return (
     <>
       <section className="profile-hero club-panel">
-        <span className="profile-portrait" aria-hidden="true">
-          {account.name.slice(0, 1).toUpperCase()}
-        </span>
+        {portrait ?? (
+          <span className="profile-portrait" aria-hidden="true">
+            <AvatarContent name={account.name} url={account.avatarUrl} />
+          </span>
+        )}
         <div>
           <h2>{account.name}</h2>
           <p>

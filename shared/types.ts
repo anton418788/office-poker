@@ -4,6 +4,7 @@ import type { HandCombination, PlayerProfile, ProfileGift } from "./profile";
 import type { TableReaction } from "./reactions";
 export type Card = { rank: number; suit: "s" | "h" | "d" | "c" };
 export type Player = {
+  avatarUrl?: string | null;
   id: string;
   name: string;
   seat: number;
@@ -107,6 +108,7 @@ export type View = Omit<Game, "deck"> & {
 };
 
 export type Account = {
+  avatarUrl?: string | null;
   id: string;
   login: string | null;
   name: string;

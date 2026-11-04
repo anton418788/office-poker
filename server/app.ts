@@ -32,6 +32,8 @@ import {
 import { addBot, step } from "./bots.js";
 import { isDealing } from "../shared/dealing.js";
 import { createProfiles } from "./profiles.js";
+import { prepareAvatar } from "./avatars.js";
+import { MAX_AVATAR_BYTES } from "../shared/avatar.js";
 import {
   tableReactions,
   REACTION_DURATION,
@@ -48,6 +50,7 @@ import {
 import type { Account, ClubState, Game, RoomSummary } from "../shared/types.js";
 
 type UserRow = {
+  avatarVersion?: string | null;
   id: string;
   login: string | null;
   name: string;
@@ -65,7 +68,10 @@ type Room = {
 export const EMPTY_ROOM_MS = 5 * 60_000;
 export const PRESENCE_MS = 45_000;
 const SESSION_MS = 30 * 86400_000;
+const avatarUrl = (u?: UserRow) =>
+  u?.avatarVersion ? `/api/avatars/${u.id}/${u.avatarVersion}.webp` : null;
 const publicUser = (u: UserRow): Account => ({
+  avatarUrl: avatarUrl(u),
   id: u.id,
   login: u.login,
   name: u.name,
@@ -113,6 +119,15 @@ export function createApp(
     CREATE TABLE IF NOT EXISTS case_openings (userId TEXT NOT NULL, requestId TEXT NOT NULL, caseId TEXT NOT NULL, json TEXT NOT NULL, openedAt INTEGER NOT NULL, PRIMARY KEY(userId,requestId));
     CREATE INDEX IF NOT EXISTS case_openings_user_time ON case_openings(userId,openedAt DESC);
     CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS user_avatars (userId TEXT PRIMARY KEY, image BLOB NOT NULL)",
+  );
+  if (
+    !(db.prepare("PRAGMA table_info(users)").all() as { name: string }[]).some(
+      (column) => column.name === "avatarVersion",
+    )
+  )
+    db.exec("ALTER TABLE users ADD COLUMN avatarVersion TEXT");
   if (
     !(
       db.prepare("PRAGMA table_info(user_equipment)").all() as {
@@ -149,7 +164,7 @@ export function createApp(
         const g: Game = JSON.parse(row.json);
         for (const p of g.players.filter((p) => !p.bot))
           db.prepare(
-            "INSERT OR IGNORE INTO users VALUES(?,NULL,?,NULL,?,0)",
+            "INSERT OR IGNORE INTO users (id,login,name,password,balance,admin) VALUES(?,NULL,?,NULL,?,0)",
           ).run(p.id, p.name, p.chips);
         if (g.players.length) {
           const sessionTable = db
@@ -330,21 +345,28 @@ export function createApp(
     }
     next();
   };
-  const roomView = (room: Room, u: UserRow) => ({
-    ...view(room.game, u.id, !!u.admin),
-    reactions: (room.game.reactions ?? []).filter(
-      (event) =>
-        event.expiresAt > now() &&
-        room.game.players.some((p) => p.id === event.playerId),
-    ),
-    room: {
-      id: room.id,
-      name: room.name,
-      hostId: room.hostId,
-      hostName: user(room.hostId)?.name ?? "Хост",
-    },
-    canManage: room.hostId === u.id || !!u.admin,
-  });
+  const roomView = (room: Room, u: UserRow) => {
+    const game = view(room.game, u.id, !!u.admin);
+    return {
+      ...game,
+      players: game.players.map((p) => ({
+        ...p,
+        avatarUrl: p.bot ? null : avatarUrl(user(p.id)),
+      })),
+      reactions: (room.game.reactions ?? []).filter(
+        (event) =>
+          event.expiresAt > now() &&
+          room.game.players.some((p) => p.id === event.playerId),
+      ),
+      room: {
+        id: room.id,
+        name: room.name,
+        hostId: room.hostId,
+        hostName: user(room.hostId)?.name ?? "Хост",
+      },
+      canManage: room.hostId === u.id || !!u.admin,
+    };
+  };
   const state = (res: express.Response, room?: Room): ClubState => {
     const u = res.locals.account ? user(res.locals.account.id) : null;
     const active = u ? occupied(u.id) : undefined;
@@ -420,13 +442,9 @@ export function createApp(
         "UPDATE users SET login=?,name=?,password=?,admin=1 WHERE id=?",
       ).run(login, name, password, id);
     else
-      db.prepare("INSERT INTO users VALUES(?,?,?,?,?,1)").run(
-        id,
-        login,
-        name,
-        password,
-        2000,
-      );
+      db.prepare(
+        "INSERT INTO users (id,login,name,password,balance,admin) VALUES(?,?,?,?,?,1)",
+      ).run(id, login, name, password, 2000);
     for (const r of rooms.values())
       if (r.hostId === id) {
         const p = r.game.players.find((p) => p.id === id);
@@ -501,6 +519,70 @@ export function createApp(
     if (next) rooms.set(next.id, next);
     res.json(state(res));
   });
+  const avatarUploads = new Set<string>();
+  app.post(
+    "/api/profile/avatar",
+    requireUser,
+    express.raw({
+      type: [
+        "application/octet-stream",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ],
+      limit: MAX_AVATAR_BYTES,
+    }),
+    async (req, res) => {
+      const u: UserRow = res.locals.account;
+      if (!Buffer.isBuffer(req.body))
+        fail("Выберите изображение JPG, PNG или WebP");
+      if (avatarUploads.has(u.id)) fail("Аватарка уже загружается", 429);
+      avatarUploads.add(u.id);
+      try {
+        const image = await prepareAvatar(req.body);
+        transaction(() => {
+          db.prepare("INSERT OR REPLACE INTO user_avatars VALUES(?,?)").run(
+            u.id,
+            image,
+          );
+          db.prepare("UPDATE users SET avatarVersion=? WHERE id=?").run(
+            randomUUID(),
+            u.id,
+          );
+        });
+        res.json(state(res));
+      } finally {
+        avatarUploads.delete(u.id);
+      }
+    },
+  );
+  app.post("/api/profile/avatar/remove", requireUser, (_req, res) => {
+    const u: UserRow = res.locals.account;
+    if (avatarUploads.has(u.id))
+      fail("Дождитесь завершения загрузки аватарки", 409);
+    transaction(() => {
+      db.prepare("DELETE FROM user_avatars WHERE userId=?").run(u.id);
+      db.prepare("UPDATE users SET avatarVersion=NULL WHERE id=?").run(u.id);
+    });
+    res.json(state(res));
+  });
+  app.get("/api/avatars/:id/:version", requireUser, (req, res) => {
+    const target = user(String(req.params.id));
+    if (
+      !target?.avatarVersion ||
+      req.params.version !== `${target.avatarVersion}.webp`
+    )
+      fail("Аватарка не найдена", 404);
+    const row = db
+      .prepare("SELECT image FROM user_avatars WHERE userId=?")
+      .get(target.id) as { image: Uint8Array } | undefined;
+    if (!row) fail("Аватарка не найдена", 404);
+    res
+      .set("Cache-Control", "private, max-age=31536000, immutable")
+      .set("X-Content-Type-Options", "nosniff")
+      .type("image/webp")
+      .send(Buffer.from(row.image));
+  });
   app.get("/api/profiles/:id", requireUser, (req, res) => {
     const target = user(String(req.params.id));
     if (!target) fail("Профиль игрока не найден", 404);
@@ -512,6 +594,7 @@ export function createApp(
         name: target.name,
         balance: target.balance,
         admin: !!target.admin,
+        avatarUrl: avatarUrl(target),
       },
       hands,
       wins,
@@ -639,13 +722,9 @@ export function createApp(
     if (db.prepare("SELECT id FROM users WHERE login=?").get(login))
       fail("Этот логин уже занят");
     const id = randomUUID();
-    db.prepare("INSERT INTO users VALUES(?,?,?,?,?,0)").run(
-      id,
-      login,
-      name,
-      password,
-      balance,
-    );
+    db.prepare(
+      "INSERT INTO users (id,login,name,password,balance,admin) VALUES(?,?,?,?,?,0)",
+    ).run(id, login, name, password, balance);
     res.status(201).json(publicUser(user(id)!));
   });
   app.post("/api/accounts/:id", requireUser, requireAdmin, async (req, res) => {
@@ -877,11 +956,14 @@ export function createApp(
           : 400;
       res.status(status).json({
         error:
-          err instanceof Error
-            ? err.message.includes("UNIQUE constraint")
-              ? "Этот логин уже занят"
-              : err.message
-            : "Некорректный запрос",
+          (err as { type?: string })?.type === "entity.too.large" &&
+          _req.path === "/api/profile/avatar"
+            ? "Максимальный размер аватарки — 5 МБ"
+            : err instanceof Error
+              ? err.message.includes("UNIQUE constraint")
+                ? "Этот логин уже занят"
+                : err.message
+              : "Некорректный запрос",
       });
     },
   );

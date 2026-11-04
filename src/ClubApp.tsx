@@ -80,8 +80,13 @@ export default function ClubApp() {
         ? {}
         : {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            headers: {
+              "Content-Type":
+                body instanceof File
+                  ? "application/octet-stream"
+                  : "application/json",
+            },
+            body: body instanceof File ? body : JSON.stringify(body),
           },
     );
     const data = await res.json();
@@ -413,6 +418,7 @@ export default function ClubApp() {
             <span>{sound.enabled ? "Звук вкл." : "Без звука"}</span>
           </button>
           <ProfileButton
+            avatarUrl={account.avatarUrl}
             name={account.name}
             count={giftCount}
             onClick={openProfile}
@@ -479,6 +485,12 @@ export default function ClubApp() {
           />
         ) : page === "profile" && profile ? (
           <ProfilePanel
+            onUploadAvatar={async (file) =>
+              !!(await perform("profile/avatar", file))
+            }
+            onRemoveAvatar={async () =>
+              !!(await perform("profile/avatar/remove"))
+            }
             key={account.id}
             account={account}
             profile={profile}

@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import sharp from "sharp";
 import assert from "node:assert/strict";
 import { createApp, EMPTY_ROOM_MS, PRESENCE_MS } from "../server/app.js";
 import { createGame, join } from "../server/engine.js";
@@ -16,6 +17,104 @@ import {
 } from "../shared/reactions.js";
 const password = "test-password-123";
 const rules = { small: 10, big: 20, minutes: 10, step: 10 };
+test("Аватарки: загрузка своего фото, общий показ, замена без накопления, лимит и сохранение после перезапуска", async () => {
+  const dir = mkdtempSync(pathJoin(tmpdir(), "poker-avatars-")),
+    path = pathJoin(dir, "game.sqlite");
+  let s = await open(path);
+  try {
+    const admin = await s.setup(),
+      player = await s.add(admin, "avatar_player");
+    const room = await s.create(player.cookie),
+      id = room.room.id;
+    await s.call(player.cookie, `rooms/${id}/bot`, { seat: 1 });
+    await s.call(player.cookie, `rooms/${id}/start`, {});
+    await s.call(player.cookie, `rooms/${id}/pause`, {});
+    const before = (await s.call(player.cookie, `rooms/${id}`)).data;
+    const input = await sharp({
+      create: { width: 800, height: 400, channels: 3, background: "#447755" },
+    })
+      .png()
+      .toBuffer();
+    const upload = async (cookie: string, data: Uint8Array) => {
+      const response = await fetch(s.url + "/api/profile/avatar", {
+        method: "POST",
+        headers: { cookie, "Content-Type": "application/octet-stream" },
+        body: Uint8Array.from(data),
+      });
+      return { status: response.status, data: await response.json() };
+    };
+    assert.equal((await upload("", input)).status, 401);
+    const saved = await upload(player.cookie, input);
+    assert.equal(saved.status, 200);
+    const url = saved.data.account.avatarUrl;
+    assert.ok(url?.startsWith(`/api/avatars/${player.user.id}/`));
+    assert.equal(saved.data.account.balance, before.account.balance);
+    const current = (await s.call(player.cookie, `rooms/${id}`)).data.room;
+    assert.equal(
+      current.players.find((p: any) => p.id === player.user.id).avatarUrl,
+      url,
+    );
+    assert.equal(current.actor, before.room.actor);
+    assert.equal(current.phase, before.room.phase);
+    assert.equal(current.hand, before.room.hand);
+    assert.equal(current.paused, true);
+    const other = (await s.call(admin, `profiles/${player.user.id}`)).data;
+    assert.equal(other.player.avatarUrl, url);
+    const image = await fetch(s.url + url, { headers: { cookie: admin } });
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("content-type"), "image/webp");
+    assert.match(image.headers.get("cache-control")!, /immutable/);
+    assert.equal(
+      (await sharp(Buffer.from(await image.arrayBuffer())).metadata()).width,
+      512,
+    );
+    assert.equal((await fetch(s.url + url)).status, 401);
+    assert.equal(
+      (await upload(player.cookie, new Uint8Array(5 * 1024 * 1024 + 1))).status,
+      413,
+    );
+    assert.equal(
+      (await upload(player.cookie, Buffer.from("not an image"))).status,
+      415,
+    );
+    assert.equal(
+      (await s.call(player.cookie, "state")).data.account.avatarUrl,
+      url,
+    );
+    await s.close();
+    s = await open(path);
+    assert.equal(
+      (await s.call(player.cookie, "state")).data.account.avatarUrl,
+      url,
+    );
+    const replacement = await upload(player.cookie, input);
+    const next = replacement.data.account.avatarUrl;
+    assert.notEqual(next, url);
+    assert.equal(
+      (await fetch(s.url + url, { headers: { cookie: admin } })).status,
+      404,
+    );
+    const db = new DatabaseSync(path);
+    assert.equal(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM user_avatars WHERE userId=?")
+        .get(player.user.id)!.n,
+      1,
+    );
+    db.close();
+    assert.equal((await s.call(admin, "state")).data.account.avatarUrl, null);
+    const removed = await s.call(player.cookie, "profile/avatar/remove", {});
+    assert.equal(removed.status, 200);
+    assert.equal(removed.data.account.avatarUrl, null);
+    assert.equal(
+      (await fetch(s.url + next, { headers: { cookie: admin } })).status,
+      404,
+    );
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true });
+  }
+});
 test("Эмоции: видны всем, только от сидящего отправителя, с паузой и без влияния на раздачу", async () => {
   const dir = mkdtempSync(pathJoin(tmpdir(), "poker-reactions-")),
     path = pathJoin(dir, "game.sqlite");
@@ -214,7 +313,7 @@ test("Профиль через API: завершение раздачи, сох
     );
     assert.deepEqual(
       Object.keys(publicResult.data.player).sort(),
-      ["id", "name", "balance", "admin"].sort(),
+      ["id", "name", "balance", "admin", "avatarUrl"].sort(),
     );
     assert.equal(JSON.stringify(publicResult.data).includes(gift.id), false);
     assert.equal((await s.call("", `profiles/${regular.user.id}`)).status, 401);
@@ -479,6 +578,7 @@ async function open(
     return r.data.room;
   };
   return {
+    url,
     instance,
     call,
     setup,
